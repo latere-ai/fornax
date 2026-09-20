@@ -47,8 +47,6 @@ flowchart LR
 ## Quick start
 
 Install the command with `go install latere.ai/x/fornax/cmd/fornax@main`.
-Upgrading from llmops? Read the [migration guide](docs/migration.md) for
-configuration names, existing caches, and deployment paths.
 
 Go 1.27 or newer, no cgo, no other build dependency:
 

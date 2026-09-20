@@ -18,7 +18,7 @@ author: changkun
 dispatched_task_id: null
 ---
 
-# Fornax naming migration
+# Fornax rebrand
 
 Fornax is the name of the model deployment and serving component previously
 called llmops. It prepares weights, launches inference engines, and exposes
@@ -34,8 +34,7 @@ healthy model endpoints. Lux retains provider routing, access, and budget policy
    `fornax.*` OTLP names, `X-Fornax-*` headers, and `fornax` harness provider IDs.
 3. Update deployment examples together: binary and config paths, container image
    names, namespace, and cache defaults. Preserve model IDs, weight formats,
-   model-specific service names, and S3 object locations. Document how to reuse
-   existing paths and update a deployment deliberately.
+   model-specific service names, and S3 object locations.
 4. Update sibling project references. Preserve unrelated work, historical
    snapshots, and external citations using the general term LLMOps.
 5. Verify the existing Go tests and e2e suite, coverage gate, model/deployment
@@ -45,15 +44,16 @@ healthy model endpoints. Lux retains provider routing, access, and budget policy
 
 ## Deployment boundary
 
-This migration changes source and examples. It does not apply Kubernetes
+This rebrand changes source and examples. It does not apply Kubernetes
 manifests, restart services, move model caches, publish container images, or
-create a release tag. An operator builds the new images and chooses the rollout
-before applying renamed deployment examples.
+create a release tag.
 
 ## Decisions
 
 - One current name across command, module, and configuration avoids a permanent
   split between product branding and the interfaces developers use.
+- Latere is the only consumer. Update internal references directly; no migration
+  guide or external-user compatibility process is needed.
 - Existing installations remain under operator control. A naming change never
   implicitly moves weights or creates a second live deployment.
 
@@ -63,7 +63,7 @@ The module, command, imports, configuration, and deployment examples use Fornax.
 The existing tests and CPU e2e tests pass. All eight packages exceed 90%
 coverage; all eight model manifests and their deployment artifacts validate.
 The build, format, spec, dependency, cgo-free, and Linux amd64/arm64 distribution
-checks pass. `docs/migration.md` describes how to update existing installations.
+checks pass. Internal references are updated directly without a migration guide.
 
 GitHub is renamed to `latere-ai/fornax`, and the local checkout is `fornax/`.
 The generic vanity handler resolves `latere.ai/x/fornax`. Installing

@@ -13,5 +13,4 @@ committed: the commit log already holds that.
 - Rename the project to Fornax, its repository to `latere-ai/fornax`, and its
   Go module to `latere.ai/x/fornax`. The command is now `cmd/fornax`.
 - Update configuration, headers, metrics, harness provider names, image names,
-  and deployment defaults to Fornax. See [migration](docs/migration.md) before
-  upgrading an existing installation. Model IDs and weight formats are unchanged.
+  and deployment defaults to Fornax. Model IDs and weight formats are unchanged.

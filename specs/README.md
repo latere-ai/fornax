@@ -43,7 +43,7 @@ and only three:
 | 025 | [Dialect surfaces](025-dialect-surfaces.md) | complete | All three caller dialects; engine dialect declared, loss reported |
 | 026 | [Harness integration](026-harness-integration.md) | complete | `ps`, `endpoint --harness`, `run` — the last mile to coding against it |
 | 027 | [Qwen fast path](027-qwen-fast-path.md) | partial | NVFP4 + a chosen draft head; built and validating, nothing served yet |
-| 028 | [Fornax naming migration](028-fornax-rename.md) | complete | Repository, module, command, configuration, and sibling references |
+| 028 | [Fornax rebrand](028-fornax-rename.md) | complete | Repository, module, command, configuration, and sibling references |
 
 ### What is built, and what each built spec still owes
 
