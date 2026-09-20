@@ -31,7 +31,7 @@ jobs:
 
   # An outbound client with no instrumented transport starts a new root trace,
   # so the caller's trace ends at this process and the time spent upstream is
-  # unattributable. llmops sits on the inference data path, which makes that
+  # unattributable. fornax sits on the inference data path, which makes that
   # the one gap worth a job of its own.
   #
   # No Go toolchain: the target reads source, so a checkout is the whole setup.

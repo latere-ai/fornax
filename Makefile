@@ -46,7 +46,7 @@ test-race:
 # via internal/deploycheck). The spec tree is a separate target now; see
 # spec-lint below.
 validate: deps cgo-free
-	$(GO) run ./cmd/llmops validate models/
+	$(GO) run ./cmd/fornax validate models/
 
 # The CLI's dependency footprint. A dependency arriving is not a failure; one
 # nobody decided on is, and the first symptom is otherwise a slower build.
@@ -119,10 +119,10 @@ e2e:
 	$(GO) test ./... -run 'E2E' -v
 
 images:
-	docker build -f Dockerfile.sglang -t $(REGISTRY)/llmops-runtime-sglang:dev .
-	docker build -f Dockerfile.sglang --build-arg SGLANG_IMAGE=lmsysorg/sglang:kimi-k3-c6ad1f26-20260729-amd64 -t $(REGISTRY)/llmops-runtime-sglang-k3:dev .
-	docker build -f Dockerfile.vllm -t $(REGISTRY)/llmops-runtime-vllm:dev .
-	docker build -f Dockerfile.mirror -t $(REGISTRY)/llmops-mirror:dev .
+	docker build -f Dockerfile.sglang -t $(REGISTRY)/fornax-runtime-sglang:dev .
+	docker build -f Dockerfile.sglang --build-arg SGLANG_IMAGE=lmsysorg/sglang:kimi-k3-c6ad1f26-20260729-amd64 -t $(REGISTRY)/fornax-runtime-sglang-k3:dev .
+	docker build -f Dockerfile.vllm -t $(REGISTRY)/fornax-runtime-vllm:dev .
+	docker build -f Dockerfile.mirror -t $(REGISTRY)/fornax-mirror:dev .
 
 # Versioned build + push of all four images (see docs/deploy.md).
 # Usage: make push-images VERSION=v0.1.0 [REGISTRY=...]
@@ -131,14 +131,14 @@ images:
 # changelog section, and `release` is that command's name everywhere.
 push-images:
 	@test -n "$(VERSION)" || { echo "usage: make push-images VERSION=vX.Y.Z [REGISTRY=...]"; exit 1; }
-	docker build --platform linux/amd64 -f Dockerfile.sglang -t $(REGISTRY)/llmops-runtime-sglang:$(VERSION) .
-	docker build --platform linux/amd64 -f Dockerfile.sglang --build-arg SGLANG_IMAGE=lmsysorg/sglang:kimi-k3-c6ad1f26-20260729-amd64 -t $(REGISTRY)/llmops-runtime-sglang-k3:$(VERSION) .
-	docker build --platform linux/amd64 -f Dockerfile.vllm -t $(REGISTRY)/llmops-runtime-vllm:$(VERSION) .
-	docker build --platform linux/amd64 -f Dockerfile.mirror -t $(REGISTRY)/llmops-mirror:$(VERSION) .
-	docker push $(REGISTRY)/llmops-runtime-sglang:$(VERSION)
-	docker push $(REGISTRY)/llmops-runtime-sglang-k3:$(VERSION)
-	docker push $(REGISTRY)/llmops-runtime-vllm:$(VERSION)
-	docker push $(REGISTRY)/llmops-mirror:$(VERSION)
+	docker build --platform linux/amd64 -f Dockerfile.sglang -t $(REGISTRY)/fornax-runtime-sglang:$(VERSION) .
+	docker build --platform linux/amd64 -f Dockerfile.sglang --build-arg SGLANG_IMAGE=lmsysorg/sglang:kimi-k3-c6ad1f26-20260729-amd64 -t $(REGISTRY)/fornax-runtime-sglang-k3:$(VERSION) .
+	docker build --platform linux/amd64 -f Dockerfile.vllm -t $(REGISTRY)/fornax-runtime-vllm:$(VERSION) .
+	docker build --platform linux/amd64 -f Dockerfile.mirror -t $(REGISTRY)/fornax-mirror:$(VERSION) .
+	docker push $(REGISTRY)/fornax-runtime-sglang:$(VERSION)
+	docker push $(REGISTRY)/fornax-runtime-sglang-k3:$(VERSION)
+	docker push $(REGISTRY)/fornax-runtime-vllm:$(VERSION)
+	docker push $(REGISTRY)/fornax-mirror:$(VERSION)
 
 # Host binaries for the bare-metal deploy mode (specs/020, specs/024).
 # GOARCH must be set explicitly: a plain `go build` targets the builder,
@@ -160,7 +160,7 @@ dist:
 		echo "dist: $$os/$$arch $(DIST_VERSION)"; \
 		GOOS=$$os GOARCH=$$arch CGO_ENABLED=0 $(GO) build \
 			-ldflags "$(DIST_LDFLAGS)" \
-			-o dist/$$os-$$arch/llmops ./cmd/llmops || exit 1; \
+			-o dist/$$os-$$arch/fornax ./cmd/fornax || exit 1; \
 	done
 	@find dist -type f -exec ls -lh {} \; | awk '{print $$9, $$5}'
 

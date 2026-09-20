@@ -17,13 +17,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/latere-ai/llmops/internal/manifest"
-	"github.com/latere-ai/llmops/internal/runtime"
+	"latere.ai/x/fornax/internal/manifest"
+	"latere.ai/x/fornax/internal/runtime"
 
 	"latere.ai/x/pkg/otel"
 )
 
-// DefaultPort is what `llmops serve` listens on unless told otherwise.
+// DefaultPort is what `fornax serve` listens on unless told otherwise.
 const DefaultPort = 8000
 
 // Model is one installed model and what it is doing right now.
@@ -111,7 +111,7 @@ func portFromUnit(path string) int {
 // Asking the endpoint which model it serves is what makes `ps` report
 // reality rather than a coincidence of port numbers.
 func probe(ctx context.Context, name string, port int, timeout time.Duration) (state string, loaded float64, speculator string) {
-	// `llmops ps` probes an endpoint this same process may be serving.
+	// `fornax ps` probes an endpoint this same process may be serving.
 	// Instrumented, the probe and whatever it finds share one trace.
 	c := &http.Client{Transport: otel.Transport(nil), Timeout: timeout}
 	base := fmt.Sprintf("http://127.0.0.1:%d", port)
@@ -172,7 +172,7 @@ func serves(ctx context.Context, c *http.Client, base, name string) bool {
 	return false
 }
 
-// weightsLoaded pulls llmops_weights_load_seconds out of /metrics — the
+// weightsLoaded pulls fornax_weights_load_seconds out of /metrics — the
 // gauge the shim already exports, so `ps` needs no new plumbing.
 func weightsLoaded(ctx context.Context, c *http.Client, base string) float64 {
 	resp, err := get(ctx, c, base+"/metrics")
@@ -182,7 +182,7 @@ func weightsLoaded(ctx context.Context, c *http.Client, base string) float64 {
 	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(resp.Body)
 	for line := range strings.SplitSeq(string(body), "\n") {
-		if v, ok := strings.CutPrefix(line, "llmops_weights_load_seconds "); ok {
+		if v, ok := strings.CutPrefix(line, "fornax_weights_load_seconds "); ok {
 			f, _ := strconv.ParseFloat(strings.TrimSpace(v), 64)
 			return f
 		}
@@ -191,7 +191,7 @@ func weightsLoaded(ctx context.Context, c *http.Client, base string) float64 {
 }
 
 // get issues one probe request on the caller's context, so a cancelled
-// `llmops ps` stops probing rather than finishing every port first.
+// `fornax ps` stops probing rather than finishing every port first.
 func get(ctx context.Context, c *http.Client, url string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

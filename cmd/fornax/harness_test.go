@@ -28,7 +28,7 @@ func installedHost(t *testing.T, state string) (configDir, unitDir string) {
 			}
 			_, _ = fmt.Fprintln(w, state)
 		case "/metrics":
-			_, _ = fmt.Fprintln(w, "llmops_weights_load_seconds 39.2")
+			_, _ = fmt.Fprintln(w, "fornax_weights_load_seconds 39.2")
 		default:
 			http.NotFound(w, r)
 		}
@@ -54,8 +54,8 @@ args: ["--max-model-len=4096", "--gpu-memory-utilization=0.65"]
 	if err := os.WriteFile(filepath.Join(configDir, "qwen.yaml"), []byte(data), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	unit := fmt.Sprintf("[Service]\nExecStart=/usr/local/bin/llmops serve "+
-		"--manifest /etc/llmops/qwen.yaml --port %d\n", port)
+	unit := fmt.Sprintf("[Service]\nExecStart=/usr/local/bin/fornax serve "+
+		"--manifest /etc/fornax/qwen.yaml --port %d\n", port)
 	if err := os.WriteFile(filepath.Join(unitDir, "qwen.service"), []byte(unit), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +188,7 @@ args: ["--max-model-len=4096", "--gpu-memory-utilization=0.65"]
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(units, "qwen.service"),
-		[]byte("[Service]\nExecStart=/usr/local/bin/llmops serve --manifest /etc/llmops/qwen.yaml --port 1\n"), 0o644); err != nil {
+		[]byte("[Service]\nExecStart=/usr/local/bin/fornax serve --manifest /etc/fornax/qwen.yaml --port 1\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -233,7 +233,7 @@ func TestRunWaitsForALoadingModel(t *testing.T) {
 			}
 			_, _ = fmt.Fprintln(w, "ready")
 		case "/metrics":
-			_, _ = fmt.Fprintln(w, "llmops_weights_load_seconds 39.2")
+			_, _ = fmt.Fprintln(w, "fornax_weights_load_seconds 39.2")
 		default:
 			http.NotFound(w, r)
 		}
@@ -257,7 +257,7 @@ args: ["--max-model-len=4096", "--gpu-memory-utilization=0.65"]
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(units, "qwen.service"), fmt.Appendf(nil,
-		"[Service]\nExecStart=/usr/local/bin/llmops serve --manifest /etc/llmops/qwen.yaml --port %d\n", port), 0o644); err != nil {
+		"[Service]\nExecStart=/usr/local/bin/fornax serve --manifest /etc/fornax/qwen.yaml --port %d\n", port), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

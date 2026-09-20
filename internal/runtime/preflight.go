@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/latere-ai/llmops/internal/manifest"
+	"latere.ai/x/fornax/internal/manifest"
 )
 
 // hostFloorBytes is the memory a unified-memory host keeps for itself

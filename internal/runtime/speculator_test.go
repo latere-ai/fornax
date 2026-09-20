@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/latere-ai/llmops/internal/manifest"
-	"github.com/latere-ai/llmops/internal/mirror"
+	"latere.ai/x/fornax/internal/manifest"
+	"latere.ai/x/fornax/internal/mirror"
 )
 
 const draftSHA = "9f2c1ab4e5d60783b1c2f4a9e8d70b6c5a4f3e21"
@@ -220,7 +220,7 @@ func TestSpeculatorMetric(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
-	if want := `llmops_speculator_info{speculator="none"} 1`; !strings.Contains(rec.Body.String(), want) {
+	if want := `fornax_speculator_info{speculator="none"} 1`; !strings.Contains(rec.Body.String(), want) {
 		t.Fatalf("metrics missing %q:\n%s", want, rec.Body.String())
 	}
 }

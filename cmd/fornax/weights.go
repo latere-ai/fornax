@@ -10,7 +10,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/latere-ai/llmops/internal/mirror"
+	"latere.ai/x/fornax/internal/mirror"
 )
 
 // runWeights handles the five verbs that act on a weight store
@@ -23,7 +23,7 @@ func runWeights(cmd string, rest []string, out, errw io.Writer) error {
 		dir := fs.String("dir", "", "local weights directory")
 		target, flags := popPositional(rest)
 		if err := fs.Parse(flags); err != nil || target == "" || *dir == "" {
-			return usagef("usage: llmops pull <hf_repo>[@revision] --dir <dir>")
+			return usagef("usage: fornax pull <hf_repo>[@revision] --dir <dir>")
 		}
 		repo, rev := splitRepo(target)
 		sha, files, err := newMirror(errw).Pull(context.Background(), repo, rev, *dir)
@@ -39,7 +39,7 @@ func runWeights(cmd string, rest []string, out, errw io.Writer) error {
 		dir := fs.String("dir", "", "weights directory to freeze in place")
 		target, flags := popPositional(rest)
 		if err := fs.Parse(flags); err != nil || target == "" || *dir == "" {
-			return usagef("usage: llmops freeze <hf_repo>@<sha> --dir <weights-dir>")
+			return usagef("usage: fornax freeze <hf_repo>@<sha> --dir <weights-dir>")
 		}
 		repo, rev := splitRepo(target)
 		if rev == "" {
@@ -59,7 +59,7 @@ func runWeights(cmd string, rest []string, out, errw io.Writer) error {
 		bucket := fs.String("bucket", "", "store root (s3://bucket or local path)")
 		target, flags := popPositional(rest)
 		if err := fs.Parse(flags); err != nil || target == "" || *dir == "" || *bucket == "" {
-			return usagef("usage: llmops push <hf_repo>@<sha> --dir <scratch> --bucket <root>")
+			return usagef("usage: fornax push <hf_repo>@<sha> --dir <scratch> --bucket <root>")
 		}
 		repo, rev := splitRepo(target)
 		if rev == "" {
@@ -82,7 +82,7 @@ func runWeights(cmd string, rest []string, out, errw io.Writer) error {
 
 	case "verify":
 		if len(rest) != 1 {
-			return usagef("usage: llmops verify <prefix>")
+			return usagef("usage: fornax verify <prefix>")
 		}
 		if err := newMirror(errw).Verify(mirror.OpenStore(rest[0])); err != nil {
 			return err
@@ -95,7 +95,7 @@ func runWeights(cmd string, rest []string, out, errw io.Writer) error {
 		fs.SetOutput(errw)
 		bucket := fs.String("bucket", "", "store root (s3://bucket or local path)")
 		if err := fs.Parse(rest); err != nil || *bucket == "" {
-			return usagef("usage: llmops list --bucket <root>")
+			return usagef("usage: fornax list --bucket <root>")
 		}
 		files, err := mirror.OpenStore(*bucket).List()
 		if err != nil {

@@ -13,7 +13,7 @@ affects:
   - internal/runtime/
   - internal/harness/
   - internal/install/
-  - cmd/llmops/
+  - cmd/fornax/
   - docs/practice.md
 effort: medium
 created: 2026-08-29
@@ -100,8 +100,8 @@ manifests would restate that in three places until one of them drifted.
 So a manifest offers a *set*, and the operator chooses when starting:
 
 ```
-llmops serve --manifest models/qwen3.8-27b-fast.yaml --speculator dflash2
-llmops serve --manifest models/qwen3.8-27b-fast.yaml --speculator none
+fornax serve --manifest models/qwen3.8-27b-fast.yaml --speculator dflash2
+fornax serve --manifest models/qwen3.8-27b-fast.yaml --speculator none
 ```
 
 `speculators` is a map from name to configuration; `default_speculator`
@@ -128,11 +128,11 @@ convention:
 naming an `hf_repo` must pin a 40-hex revision and state its own
 license. The DSpark head is licensed `other` while the target it drafts
 for is apache-2.0 — a manifest that omitted it would ship a third-party
-artifact under the base model's declaration. `llmops freeze` and
+artifact under the base model's declaration. `fornax freeze` and
 `verify` work on it unchanged, because it is the same cache layout.
 
 **The manifest never writes the draft path.** It resolves to
-`<cache-root>/<hf_repo>/<revision>` and llmops supplies it at launch,
+`<cache-root>/<hf_repo>/<revision>` and Fornax supplies it at launch,
 for the same reason primary weights name no directory
 ([[021-local-weight-loading]]): an absolute path would pin a checked-in
 file to one machine.
@@ -177,15 +177,15 @@ Suffixing it would break every caller's configuration whenever an
 operator restarted with a different head, and the model being served
 really is the same model.
 
-Instead the shim reports `X-LLMOps-Speculator` on every response,
+Instead the shim reports `X-Fornax-Speculator` on every response,
 following [[025-dialect-surfaces]]'s loss header: an engine-side fact
 the caller cannot otherwise see, carried without touching the payload.
-`llmops ps` reads it from the readiness probe and shows a SPECULATOR
-column, and `/metrics` exports `llmops_speculator_info` so a throughput
+`fornax ps` reads it from the readiness probe and shows a SPECULATOR
+column, and `/metrics` exports `fornax_speculator_info` so a throughput
 panel can be broken down by it. A number that does not record which
 draft head produced it cannot be attributed, and AC3 asks for four.
 
-`llmops install --speculator <name>` pins the choice into the systemd
+`fornax install --speculator <name>` pins the choice into the systemd
 unit. Without that, a restart would quietly fall back to the manifest's
 default.
 
@@ -217,7 +217,7 @@ env, 5.16.1 in the vLLM env, vLLM still serving. That is an amendment to
 
 ## Measuring it needed a fix to the measurement
 
-`llmops bench` reported `chunks_per_s`, counting server-sent events.
+`fornax bench` reported `chunks_per_s`, counting server-sent events.
 That equals tokens per second only when the engine emits one token per
 event, which is exactly what speculative decoding stops doing: a verify
 step commits several tokens at once. The reference's own README records
@@ -226,7 +226,7 @@ a published figure for this model that was wrong for this reason.
 Bench now asks for `stream_options.include_usage` and reports
 `tokens_per_s` from the engine's own accounting, keeping `chunks_per_s`
 beside it as a transport statistic. It also records the
-`X-LLMOps-Speculator` header in the report, and refuses a run where the
+`X-Fornax-Speculator` header in the report, and refuses a run where the
 endpoint changed speculator partway through — that aggregate would
 describe two configurations at once.
 
@@ -269,8 +269,8 @@ tested and validating. Every package clears the 90% floor.
 | `serve --speculator` | resolved before any weights are touched |
 | `install --speculator` | pinned into the unit; unknown names fail before writing |
 | `ps` | SPECULATOR column, read from the endpoint |
-| `X-LLMOps-Speculator`, `llmops_speculator_info` | attribution |
-| `llmops bench` | real token counts, and the speculator recorded |
+| `X-Fornax-Speculator`, `fornax_speculator_info` | attribution |
+| `fornax bench` | real token counts, and the speculator recorded |
 | `models/qwen3.8-27b-fast.yaml` | three speculators, pinned and licensed |
 
 **Nothing has been served yet.** The artifacts are frozen on the box,
@@ -305,14 +305,14 @@ Three things to carry forward:
 ## Acceptance criteria
 
 - **AC1** The NVFP4 weights and each separately published draft head are
-  pulled, frozen and verified by `llmops freeze`, with `license_note`
+  pulled, frozen and verified by `fornax freeze`, with `license_note`
   recording the third-party requantization. **Met** — 23 GB target,
   3.5 GB DSpark head, 3.6 GB DFlash2 head, each with its own
   `_manifest.json`.
 - **AC2** `models/qwen3.8-27b-fast.yaml` validates and serves under the
   name `qwen3.8-27b-fast`, never aliased to `qwen3.8-27b`. *Validates;
   has not served.*
-- **AC3** Measured throughput on our box, by `llmops bench`, for each
+- **AC3** Measured throughput on our box, by `fornax bench`, for each
   speculator **and** for `none`, on both a code prompt and a prose
   prompt — the two are different numbers and reporting one is
   misleading. Each measurement records the speculator that produced it.

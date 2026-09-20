@@ -6,7 +6,7 @@ depends_on:
   - 002-weights-registry.md
 affects:
   - internal/runtime/
-  - cmd/llmops/
+  - cmd/fornax/
   - models/
   - Dockerfile.sglang
   - Dockerfile.vllm
@@ -28,7 +28,7 @@ caller-facing API plus the latere health/metrics contract (`/healthz`,
 `/ready`, `/metrics`), the same one the other latere serving images
 honor.
 
-`llmops serve` is that process, and it is the same process in both deploy
+`fornax serve` is that process, and it is the same process in both deploy
 modes: a container entrypoint under Kubernetes ([[008-k8s-serving]]) or
 `ExecStart` in a systemd unit on a host with no cluster
 ([[020-bare-metal-packaging]]). The mode decides how it is started and
@@ -69,8 +69,8 @@ Which one the engine speaks natively is a manifest fact, not shim
 wiring: `engine_dialect` (default `openai-chat`). The matching surface
 proxies through untouched; the other two translate through the shared
 `latere.ai/x/pkg/llmdialect` package. What a translation cannot carry is
-**reported, not dropped** — returned in the `X-LLMOps-Compat-Loss`
-response header and counted in `llmops_dialect_loss_total{dialect,field}`,
+**reported, not dropped** — returned in the `X-Fornax-Compat-Loss`
+response header and counted in `fornax_dialect_loss_total{dialect,field}`,
 so a lossy pairing is visible to the caller that hit it.
 
 The **Lux dialect is deliberately not served here**: that surface belongs
@@ -79,7 +79,7 @@ duplicating it per pod would re-implement gateway concerns.
 
 ## Components
 
-1. **`llmops serve --manifest <path>`** (`internal/runtime`) — reads the
+1. **`fornax serve --manifest <path>`** (`internal/runtime`) — reads the
    manifest, resolves the weight store, prepares weights (below), renders
    engine CLI args, starts the engine and fronts it with the shim. One
    image per engine (`Dockerfile.sglang`, `Dockerfile.vllm`) for the
@@ -103,8 +103,8 @@ duplicating it per pod would re-implement gateway concerns.
    sidecar-free shim maps them to the latere contract: `/healthz` (process
    up), `/ready` (weights verified **and** engine reports ready),
    `/metrics` (engine's Prometheus output passed through, plus
-   `llmops_weights_load_seconds`, `llmops_dialect_loss_total` and
-   `llmops_speculator_info`).
+   `fornax_weights_load_seconds`, `fornax_dialect_loss_total` and
+   `fornax_speculator_info`).
 
 ## Manifest schema (`models/<name>.yaml`)
 
@@ -131,7 +131,7 @@ args:                           # engine-specific flags, verbatim
 `system_prompt`, and the `speculators` map a fast path selects from
 ([[027-qwen-fast-path]]), are the two optional blocks on top of this.
 
-Schema validated by a `llmops validate` subcommand (test-covered); CI
+Schema validated by a `fornax validate` subcommand (test-covered); CI
 validates all manifests.
 
 ## Custom runtimes (`runtime: custom`)
@@ -155,7 +155,7 @@ container.
    the e2e test for the whole S3→engine path, runnable in CI on one GPU.
 2. `/healthz`, `/ready`, `/metrics` behave per the shared service
    contract: `/ready` 503 during load, 200 after; metrics include
-   `llmops_weights_load_seconds`.
+   `fornax_weights_load_seconds`.
 3. NVMe cache mode: second pod start on a warm node skips download
    (test asserts no S3 GETs); corrupted cache file is detected and
    re-fetched (test).
@@ -167,7 +167,7 @@ container.
 6. All three caller surfaces return well-formed responses (and SSE
    streams) for any `engine_dialect`: the matching one proxied untouched,
    the other two translated, with the loss report in
-   `X-LLMOps-Compat-Loss` and `llmops_dialect_loss_total`. Malformed
+   `X-Fornax-Compat-Loss` and `fornax_dialect_loss_total`. Malformed
    requests 400, engine failures pass through (tests against a fake
    engine). Detail in [[025-dialect-surfaces]].
 

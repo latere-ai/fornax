@@ -1,5 +1,5 @@
 ---
-title: "One binary: the llmops command"
+title: "One binary: the fornax command"
 status: complete
 depends_on:
   - 003-serving-runtime.md
@@ -20,24 +20,24 @@ author: changkun
 dispatched_task_id: null
 ---
 
-# One binary: the llmops command
+# One binary: the Fornax command
 
 ## Decision
 
-**Collapse `mirror`, `runtime` and `bench` into one `llmops` binary with
+**Collapse `mirror`, `runtime` and `bench` into one `fornax` binary with
 a flat set of subcommands.**
 
 ```
-llmops pull      <repo>[@rev] --dir <dir>              fetch weights from HF
-llmops freeze    <repo>@<sha> --dir <dir>              write the store manifest in place
-llmops push      <repo>@<sha> --dir <dir> --bucket …   upload to an object store
-llmops verify    <prefix>                              check a store against its manifest
-llmops list      --bucket <root>                       what is mirrored there
-llmops serve     --manifest <path>                     engine entrypoint / ExecStart
-llmops validate  models/                               manifest + deploy consistency
-llmops install   --manifest <path>                     place the unit + manifest on a host
-llmops bench     --url … --model …                     live endpoint benchmark
-llmops version                                         what is installed on this host
+fornax pull      <repo>[@rev] --dir <dir>              fetch weights from HF
+fornax freeze    <repo>@<sha> --dir <dir>              write the store manifest in place
+fornax push      <repo>@<sha> --dir <dir> --bucket …   upload to an object store
+fornax verify    <prefix>                              check a store against its manifest
+fornax list      --bucket <root>                       what is mirrored there
+fornax serve     --manifest <path>                     engine entrypoint / ExecStart
+fornax validate  models/                               manifest + deploy consistency
+fornax install   --manifest <path>                     place the unit + manifest on a host
+fornax bench     --url … --model …                     live endpoint benchmark
+fornax version                                         what is installed on this host
 ```
 
 Ten, counting `install`, which [[020-bare-metal-packaging]] had already
@@ -65,7 +65,7 @@ case one level down to keep the rare ones tidy is the wrong trade. Nine
 flat verbs is well inside what a CLI carries without grouping.
 
 **One name changes: `ls` becomes `list`.** Under the old grouping the
-object was implied by the group name; as a top-level verb `llmops ls`
+object was implied by the group name; as a top-level verb `fornax ls`
 reads as a shell idiom and says nothing about what is listed. This is the
 only verb whose spelling moves, and it moves now because nothing depends
 on it yet.
@@ -78,13 +78,13 @@ is the test `mirror` failed.
 ## Why
 
 **The repo is named for a command that does not exist.** After the
-rename there is no `llmops` to type. That is the small reason.
+rename there is no `fornax` to type. That is the small reason.
 
 **The bare-metal mode makes it a real cost.**
 [[020-bare-metal-packaging]] ships binaries to a host and supervises one
 under systemd. Three binaries mean three files to copy, three to version,
 three to keep in step, and an install command that has to reason about
-which of them a given host needs. One binary makes `llmops install` and
+which of them a given host needs. One binary makes `fornax install` and
 the unit file trivial, and makes "what version is on that box" answerable
 with one command rather than three.
 
@@ -118,9 +118,9 @@ All three entrypoints already share one signature:
 func run(args []string, out, errw io.Writer) int
 ```
 
-So this is routing, not rewriting. `cmd/llmops/main.go` dispatches on
+So this is routing, not rewriting. `cmd/fornax/main.go` dispatches on
 `args[0]` to the existing bodies, which move beside it as
-`cmd/llmops/{weights,serve,bench}.go` in package `main`. Their
+`cmd/fornax/{weights,serve,bench}.go` in package `main`. Their
 tests move with them unchanged, which is the point: a refactor that
 needed its tests rewritten would not be a refactor.
 
@@ -135,7 +135,7 @@ Flattening lifts that shared preamble to the top-level dispatch rather
 than duplicating it five times — `splitRepo` and `popPositional` are
 already free functions, so they move up unchanged.
 
-**`llmops version` is new.** It prints the build version and the commit.
+**`fornax version` is new.** It prints the build version and the commit.
 A binary that is copied onto hosts by hand needs a way to answer which
 one is there; the container mode never needed it because the image tag
 answered it.
@@ -144,9 +144,9 @@ answered it.
 
 | Place | From | To |
 |---|---|---|
-| Dockerfiles | `ENTRYPOINT ["runtime", "serve"]` | `ENTRYPOINT ["llmops", "serve"]` |
-| systemd unit ([[020-bare-metal-packaging]]) | the old binary name in `ExecStart` | `/usr/local/bin/llmops serve` |
-| Makefile | a per-binary `go run ./cmd/…` | `go run ./cmd/llmops validate` |
+| Dockerfiles | `ENTRYPOINT ["runtime", "serve"]` | `ENTRYPOINT ["fornax", "serve"]` |
+| systemd unit ([[020-bare-metal-packaging]]) | the old binary name in `ExecStart` | `/usr/local/bin/fornax serve` |
+| Makefile | a per-binary `go run ./cmd/…` | `go run ./cmd/fornax validate` |
 | `make dist` | three binaries per platform | one |
 | docs/deploy.md, README | three tools | one, with subcommands |
 
@@ -158,9 +158,9 @@ answered it.
   their new location, save for the program name and the dropped `mirror`
   word in usage assertions. A test that needed rewriting means behaviour
   moved, which this spec does not permit.
-- **AC3** `llmops` with no arguments, and with an unknown subcommand,
+- **AC3** `fornax` with no arguments, and with an unknown subcommand,
   exits non-zero and lists the available subcommands.
-- **AC3a** `llmops mirror <anything>` fails as an unknown subcommand
+- **AC3a** `fornax mirror <anything>` fails as an unknown subcommand
   rather than silently doing nothing, so a stale invocation from a
   script or a doc is loud.
 - **AC4** `make dist` produces exactly one binary per platform, and it is
@@ -169,12 +169,12 @@ answered it.
   since the shared packages were being linked three times and `-s -w`
   now strips the result.
 - **AC5** Every Dockerfile entrypoint, the Makefile, docs/deploy.md, README
-  and [[020-bare-metal-packaging]]'s unit file name `llmops`; no
+  and [[020-bare-metal-packaging]]'s unit file name `fornax`; no
   reference to a `runtime`, `mirror` or `bench` binary survives.
-- **AC6** `llmops version` reports a version and commit injected at build
+- **AC6** `fornax version` reports a version and commit injected at build
   time, and `make dist` sets them.
 - **AC7** `deploycheck` asserts a bare-metal unit's `ExecStart` names the
-  `llmops` binary, so a stale unit referencing the old name fails CI
+  `fornax` binary, so a stale unit referencing the old name fails CI
   rather than the host.
 
 ## Out of scope

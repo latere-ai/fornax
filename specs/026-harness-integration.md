@@ -6,7 +6,7 @@ depends_on:
   - 024-single-cli.md
   - 025-dialect-surfaces.md
 affects:
-  - cmd/llmops/
+  - cmd/fornax/
   - internal/install/
   - README.md
   - docs/practice.md
@@ -33,14 +33,14 @@ it" is done by hand, from memory, differently each time.
 Three verbs close it.
 
 ```
-llmops ps                                what is serving on this host
-llmops endpoint --harness claude         config to paste or eval
-llmops run claude --model qwen3.8-27b    launch the harness against it
+fornax ps                                what is serving on this host
+fornax endpoint --harness claude         config to paste or eval
+fornax run claude --model qwen3.8-27b    launch the harness against it
 ```
 
 ## `ps`, not `ls`
 
-`llmops list` already exists and lists **mirrored weights** in a store.
+`fornax list` already exists and lists **mirrored weights** in a store.
 A second listing verb one character away, for a different object, is the
 ambiguity [[024-single-cli]] renamed `ls` to `list` to avoid — bringing
 `ls` back for running processes would undo that on purpose.
@@ -49,8 +49,8 @@ ambiguity [[024-single-cli]] renamed `ls` to `list` to avoid — bringing
 using this has already used. The two verbs then read as what they are:
 
 ```
-llmops list --bucket …    weights we have frozen
-llmops ps                 models answering requests right now
+fornax list --bucket …    weights we have frozen
+fornax ps                 models answering requests right now
 ```
 
 ### How it discovers
@@ -58,7 +58,7 @@ llmops ps                 models answering requests right now
 Host-local and mode-agnostic, in three steps:
 
 1. Read installed manifests from the config directory
-   (`/etc/llmops/*.yaml`) — what [[020-bare-metal-packaging]]'s install
+   (`/etc/fornax/*.yaml`) — what [[020-bare-metal-packaging]]'s install
    placed there.
 2. Take each model's port from its unit's `ExecStart`, defaulting to
    8000. The manifest has no port field, and should not grow one: the
@@ -75,7 +75,7 @@ NAME          STATE    PORT  RUNTIME  GPU      LOADED
 qwen3.8-27b   ready    8000  vllm     1xgb10   39.2s
 ```
 
-`LOADED` comes from `llmops_weights_load_seconds`, which the shim
+`LOADED` comes from `fornax_weights_load_seconds`, which the shim
 already exports. Kubernetes models are out of scope: this answers
 "what is on this box", and a cluster has its own answer.
 
@@ -111,7 +111,7 @@ Default output is whatever that harness reads; `--format env|json|toml`
 overrides. `env` output is `eval`-able:
 
 ```sh
-eval "$(llmops endpoint --harness claude --model qwen3.8-27b)"
+eval "$(fornax endpoint --harness claude --model qwen3.8-27b)"
 ```
 
 Adding a fourth harness is a row. If it ever requires more than a row,
@@ -149,8 +149,8 @@ Resolves the model, builds the same environment `endpoint` prints, and
 the terminal behave exactly as running the harness directly.
 
 ```sh
-llmops run claude --model qwen3.8-27b
-llmops run codex  --model qwen3.8-27b -- --full-auto
+fornax run claude --model qwen3.8-27b
+fornax run codex  --model qwen3.8-27b -- --full-auto
 ```
 
 Arguments after `--` pass through untouched.

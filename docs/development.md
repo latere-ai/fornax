@@ -1,6 +1,6 @@
 # Development
 
-Building, testing, and contributing to llmops itself. To *operate* it,
+Building, testing, and contributing to Fornax itself. To *operate* it,
 read the [deploy guide](./deploy.md) instead.
 
 ## Build
@@ -8,15 +8,15 @@ read the [deploy guide](./deploy.md) instead.
 Go 1.27 or newer, no cgo, no other build dependency:
 
 ```sh
-git clone https://github.com/latere-ai/llmops.git
-cd llmops
+git clone https://github.com/latere-ai/fornax.git
+cd fornax
 make build                       # go build ./...
 make dist                        # static linux/amd64 + linux/arm64 binaries
 make hooks                       # pre-commit gofmt + modernizer guard
 ```
 
 `make dist` stamps `version` and `commit` into the binary; a plain
-`go build` still answers `llmops version` from what the toolchain
+`go build` still answers `fornax version` from what the toolchain
 recorded.
 
 ## Test
@@ -68,14 +68,14 @@ is a per-model release gate, run by hand against the model's spec.
 ## Layout
 
 ```
-cmd/llmops/   the one command (weights, serving, bench)
+cmd/fornax/   the one command (weights, serving, bench)
 internal/
   manifest/   the models/*.yaml schema and its validation
   mirror/     Hugging Face fetch, checksum, freeze, S3 push/verify
   runtime/    the serving entrypoint: weight prep, engine launch, shim
   install/    systemd unit rendering for the bare-metal mode
   deploycheck/ manifest ↔ deploy-artifact consistency
-  bench/      the load generator behind `llmops bench`
+  bench/      the load generator behind `fornax bench`
 deploy/       one artifact per model: a k8s LeaderWorkerSet, or a unit
 models/       per-model manifests
 e2e/          fake-backed pipeline tests, plus the local full-stack run

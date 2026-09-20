@@ -38,8 +38,8 @@ args: ["--max-model-len=4096", "--gpu-memory-utilization=0.65"]
 
 func writeUnitWithPort(t *testing.T, unitDir, name string, port int) {
 	t.Helper()
-	body := fmt.Sprintf("[Service]\nExecStart=/usr/local/bin/llmops serve "+
-		"--manifest /etc/llmops/%s.yaml --port %d\n", name, port)
+	body := fmt.Sprintf("[Service]\nExecStart=/usr/local/bin/fornax serve "+
+		"--manifest /etc/fornax/%s.yaml --port %d\n", name, port)
 	if err := os.WriteFile(filepath.Join(unitDir, name+".service"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func fakeShim(t *testing.T, state string, loaded float64) *httptest.Server {
 		case "/v1/models":
 			_, _ = fmt.Fprint(w, `{"data":[{"id":"qwen"}]}`)
 		case "/metrics":
-			_, _ = fmt.Fprintf(w, "llmops_weights_load_seconds %g\n", loaded)
+			_, _ = fmt.Fprintf(w, "fornax_weights_load_seconds %g\n", loaded)
 		default:
 			http.NotFound(w, r)
 		}
@@ -153,7 +153,7 @@ func TestPortComesFromTheUnit(t *testing.T) {
 	}
 
 	// The equals form is equally valid in a unit file.
-	body := "[Service]\nExecStart=/usr/local/bin/llmops serve --manifest /etc/llmops/qwen.yaml --port=9124\n"
+	body := "[Service]\nExecStart=/usr/local/bin/fornax serve --manifest /etc/fornax/qwen.yaml --port=9124\n"
 	if err := os.WriteFile(filepath.Join(units, "qwen.service"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +195,7 @@ func TestDiscoverRejectsAPortServingAnotherModel(t *testing.T) {
 		case "/v1/models":
 			_, _ = fmt.Fprint(w, `{"data":[{"id":"some-other-model"}]}`)
 		default:
-			_, _ = fmt.Fprintln(w, "llmops_weights_load_seconds 1")
+			_, _ = fmt.Fprintln(w, "fornax_weights_load_seconds 1")
 		}
 	}))
 	defer srv.Close()
@@ -223,7 +223,7 @@ func TestDiscoverTrustsAnEngineWithoutAModelList(t *testing.T) {
 		case "/v1/models":
 			http.NotFound(w, r)
 		default:
-			_, _ = fmt.Fprintln(w, "llmops_weights_load_seconds 5")
+			_, _ = fmt.Fprintln(w, "fornax_weights_load_seconds 5")
 		}
 	}))
 	defer srv.Close()

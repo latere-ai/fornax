@@ -122,12 +122,12 @@ chosen per workload when the model is started rather than written into
 the manifest:
 
 ```
-llmops serve --manifest models/qwen3.8-27b-fast.yaml --speculator dflash2
-llmops serve --manifest models/qwen3.8-27b-fast.yaml --speculator none
+fornax serve --manifest models/qwen3.8-27b-fast.yaml --speculator dflash2
+fornax serve --manifest models/qwen3.8-27b-fast.yaml --speculator none
 ```
 
-`llmops ps` shows which one is running, and every response carries an
-`X-LLMOps-Speculator` header. Record it alongside any throughput
+`fornax ps` shows which one is running, and every response carries an
+`X-Fornax-Speculator` header. Record it alongside any throughput
 number: the same endpoint gives a different figure with a different
 head, so a measurement that omits it cannot be compared to anything.
 
@@ -315,7 +315,7 @@ This bit twice in one session, in two different disguises:
 
 ```sh
 pgrep -f "hf download"          # matched the ssh session running the pgrep
-pkill  -f "llmops serve"        # killed that ssh session
+pkill  -f "fornax serve"        # killed that ssh session
 ```
 
 Over Tailscale SSH (and under `ssh host '<cmd>'` generally), the remote

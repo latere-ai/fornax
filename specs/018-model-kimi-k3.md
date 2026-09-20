@@ -110,7 +110,7 @@ as [[006-model-minimax-m3]] does.
 
 0. **License gate**: internal-use determination recorded in the manifest
    `license_note`. Blocks AC7.
-1. Mirrored to S3 at the pinned revision, `llmops verify` clean. Needs
+1. Mirrored to S3 at the pinned revision, `fornax verify` clean. Needs
    ≥1.6 TB of scratch on the mirror Job and roughly doubles registry
    storage — size both before starting.
 2. `models/kimi-k3.yaml` validates: `sglang`, b300 x8 x1, TP8 + DCP8,
@@ -121,11 +121,11 @@ as [[006-model-minimax-m3]] does.
    the rule. Closes the gap the H200 fallback would otherwise walk into.
    **Holds today**, alongside AC2 and AC4; those three are the built
    part of this spec.
-4. `Dockerfile.sglang` builds `llmops-runtime-sglang-k3` from the
+4. `Dockerfile.sglang` builds `fornax-runtime-sglang-k3` from the
    pinned CUDA 13 K3 image, selected with
    `--build-arg SGLANG_IMAGE=…`; the two images differ only in their
    base, so they share one Dockerfile. `make push-images` publishes it
-   alongside the others. The shared `llmops-runtime-sglang` image is **not** bumped
+   alongside the others. The shared `fornax-runtime-sglang` image is **not** bumped
    to cu130 — that would force an r580+ driver on the h200/b200 pools
    for the sake of a model that does not run there.
 5. Serves on the 8x B300 node via LWS. `--mamba-full-memory-ratio` is
@@ -142,7 +142,7 @@ as [[006-model-minimax-m3]] does.
    already served one on GB10, so the vision path through the shim is no
    longer unproven, only untried at this scale), and a ≥256K-context
    request.
-7. Registered in Lux as `llmops/kimi-k3` — gated on AC0. Verify Lux
+7. Registered in Lux as `fornax/kimi-k3` — gated on AC0. Verify Lux
    passes `reasoning_effort` through and does not strip
    `reasoning_content` from assistant turns on the way back in.
 8. Baseline benchmark recorded (010 harness), and re-run once the vendor

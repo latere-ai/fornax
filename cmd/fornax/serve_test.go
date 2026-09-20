@@ -75,7 +75,7 @@ func TestValidateFileAndDir(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := writeValid(t, models)
-	writeLWSFor(t, filepath.Join(root, "deploy"), "tiny", "ghcr.io/x/llmops-runtime-sglang:v1", 8)
+	writeLWSFor(t, filepath.Join(root, "deploy"), "tiny", "ghcr.io/x/fornax-runtime-sglang:v1", 8)
 	var out, errw strings.Builder
 
 	// A single file is a manifest check only: one manifest says nothing
@@ -128,7 +128,7 @@ args: ["--max-model-len=4096", "--gpu-memory-utilization=0.65"]
 		}
 	}
 
-	unit("/usr/local/bin/llmops serve --manifest /etc/llmops/qwen.yaml")
+	unit("/usr/local/bin/fornax serve --manifest /etc/fornax/qwen.yaml")
 	var out, errw strings.Builder
 	if code := run([]string{"validate", models}, &out, &errw); code != 0 {
 		t.Fatalf("consistent pair rejected: exit %d: %s", code, errw.String())
@@ -136,7 +136,7 @@ args: ["--max-model-len=4096", "--gpu-memory-utilization=0.65"]
 
 	// A unit naming the pre-rename binary must fail the command a person
 	// runs, not only a test somewhere in the tree.
-	unit("/usr/local/bin/runtime serve --manifest /etc/llmops/qwen.yaml")
+	unit("/usr/local/bin/runtime serve --manifest /etc/fornax/qwen.yaml")
 	out.Reset()
 	errw.Reset()
 	if code := run([]string{"validate", models}, &out, &errw); code == 0 {
@@ -203,7 +203,7 @@ func TestServeManifestLoadError(t *testing.T) {
 func TestServeEndToEnd(t *testing.T) {
 	dir := t.TempDir()
 	p := writeValid(t, dir)
-	t.Setenv("LLMOPS_ENGINE_CMD", "sleep 60")
+	t.Setenv("FORNAX_ENGINE_CMD", "sleep 60")
 	var out, errw strings.Builder
 	code := run([]string{"serve", "--manifest", p, "--port", "0", "--cache-root", t.TempDir()}, &out, &errw)
 	if code == 0 {

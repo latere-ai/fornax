@@ -33,7 +33,7 @@ undamaged and leaves roughly 45 GB of the node free. Those are different
 products.
 
 It is also the first model that makes the registry's scope explicit:
-**llmops serves what we choose to own, not only frontier-scale MoE.**
+**Fornax serves what we choose to own, not only frontier-scale MoE.**
 If that is wrong, this spec is where to say so.
 
 ## Facts (verified 2026-08-28)
@@ -125,7 +125,7 @@ at the cost of that margin; it is a deliberate change, not a default.
 
 The vendor checkpoint is served **as published** — BF16 safetensors, no
 conversion, no derived artifacts, no third-party requantization. `mirror
-pull` fetches `Qwen/Qwen3.8-27B` at the pinned SHA, `llmops freeze`
+pull` fetches `Qwen/Qwen3.8-27B` at the pinned SHA, `fornax freeze`
 writes `_manifest.json`, and [[021-local-weight-loading]] verifies it in
 place at launch. The freeze chain has exactly one link and it ends at
 the vendor.
@@ -189,7 +189,7 @@ This is also the first manifest in the registry with
 
 ## Outcome (brought up 2026-08-29)
 
-Served on a GB10 box through `llmops serve` with `load: local` and
+Served on a GB10 box through `fornax serve` with `load: local` and
 `deploy: bare-metal`. Every number below is measured, not derived.
 
 ### The arithmetic held
@@ -219,7 +219,7 @@ per request: 1.11x" — so one full-context request fits with room over.
   nothing fails loudly if the tower is silently absent, so this was
   tested against a real image rather than inferred from a clean start.
 - Served under the manifest name `qwen3.8-27b`; `/metrics` exports
-  `llmops_weights_load_seconds 39.19`.
+  `fornax_weights_load_seconds 39.19`.
 - `/v1/responses` is served too — [[025-dialect-surfaces]] made all
   three caller dialects universal after AC2 was written — and was
   **not** exercised in this bring-up. AC2 asked for two surfaces and
@@ -236,7 +236,7 @@ have killed this mid-load; [[020-bare-metal-packaging]]'s
 
 ### Throughput is the disappointment: ~3 tokens/s
 
-`llmops bench` over 3 requests, concurrency 1: **2.99 tokens/s**, TTFT
+`fornax bench` over 3 requests, concurrency 1: **2.99 tokens/s**, TTFT
 p50 **691 ms**, no errors.
 
 Measured achievable bandwidth on this box is **~230 GB/s**, so reading

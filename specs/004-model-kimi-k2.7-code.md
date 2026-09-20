@@ -44,7 +44,7 @@ focus matches latere's primary workload. Thinking mode is always on.
 1. Mirrored to S3 with verified manifest ([[002-weights-registry]] AC4).
 2. `models/kimi-k2.7-code.yaml` validates; `runtime: sglang`, TP8,
    `--tool-call-parser kimi_k2 --reasoning-parser kimi_k2`, and
-   `deploy/kimi-k2.7-code/lws.yaml` matches it — `llmops validate`
+   `deploy/kimi-k2.7-code/lws.yaml` matches it — `fornax validate`
    checks manifest and deploy artifact against each other, and CI runs
    the same check. **Holds today**; it is the only criterion here that
    does.

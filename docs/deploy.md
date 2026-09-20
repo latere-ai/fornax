@@ -10,8 +10,8 @@ customization knob. Design rationale lives in [`specs/`](../specs/README.md).
 | What | Why | Notes |
 |---|---|---|
 | An S3-compatible bucket | frozen weights home | AWS S3, DO Spaces, R2, MinIO, anything s5cmd speaks. Enable versioning; Object Lock if supported. The checked-in manifests point at a bucket named `latere-models`; change `s3_prefix` in `models/*.yaml` to use your own. |
-| k8s Secret `mirror-s3` in ns `llmops` | mirror Job + node cache credentials | keys: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, plus `S3_ENDPOINT_URL` for non-AWS. Optional `HF_TOKEN` for gated repos. |
-| GPU nodes + NVIDIA GPU Operator | run the engines | node pools labeled `latere.ai/gpu-pool: h200`, `b200`, or `b300`; NVMe at `/var/cache/llmops`. The `b300` pool needs an **r580+ driver** — Kimi-K3's image is CUDA 13 only |
+| k8s Secret `mirror-s3` in ns `fornax` | mirror Job + node cache credentials | keys: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, plus `S3_ENDPOINT_URL` for non-AWS. Optional `HF_TOKEN` for gated repos. |
+| GPU nodes + NVIDIA GPU Operator | run the engines | node pools labeled `latere.ai/gpu-pool: h200`, `b200`, or `b300`; NVMe at `/var/cache/fornax`. The `b300` pool needs an **r580+ driver** — Kimi-K3's image is CUDA 13 only |
 | [LeaderWorkerSet](https://github.com/kubernetes-sigs/lws) installed | pod-group primitive for (multi-node-ready) serving | `kubectl apply --server-side -f https://github.com/kubernetes-sigs/lws/releases/latest/download/manifests.yaml` |
 | `docker login <registry>` | push images | default registry is `ghcr.io/latere-ai`; any OCI registry works (ECR, Nexus, Harbor, …) via `REGISTRY=` |
 
@@ -29,10 +29,10 @@ builds and pushes `linux/amd64` images (default registry
 `ghcr.io/latere-ai`; the image *names* are fixed, the registry prefix is
 yours):
 
-- `llmops-runtime-sglang` — SGLang engine (pinned; see the [engine decision record](../specs/001-inference-engine-selection.md)) + the `llmops serve` entrypoint
-- `llmops-runtime-sglang-k3` — Kimi-K3-capable SGLang (CUDA 13, r580+ driver). Separate image because that driver requirement should not reach the h200/b200 pools
-- `llmops-runtime-vllm` — vLLM engine + the `llmops serve` entrypoint (also the `load: s3-stream` path)
-- `llmops-mirror` — the `llmops` binary + `hf` + `s5cmd`, for the weight-freeze Job
+- `fornax-runtime-sglang` — SGLang engine (pinned; see the [engine decision record](../specs/001-inference-engine-selection.md)) + the `fornax serve` entrypoint
+- `fornax-runtime-sglang-k3` — Kimi-K3-capable SGLang (CUDA 13, r580+ driver). Separate image because that driver requirement should not reach the h200/b200 pools
+- `fornax-runtime-vllm` — vLLM engine + the `fornax serve` entrypoint (also the `load: s3-stream` path)
+- `fornax-mirror` — the `fornax` binary + `hf` + `s5cmd`, for the weight-freeze Job
 
 Engine versions are pinned in the Dockerfiles — bump them deliberately,
 never `latest`. After a release, update the image references in
@@ -49,8 +49,8 @@ disk live there):
 ```sh
 # Edit deploy/mirror/job.yaml: set metadata.name, MODEL_REPO, MODEL_SHA,
 # --bucket, and the scratch volume size (>= the model's size on disk).
-kubectl -n llmops apply -f deploy/mirror/job.yaml
-kubectl -n llmops logs -f job/mirror-<name>
+kubectl -n fornax apply -f deploy/mirror/job.yaml
+kubectl -n fornax logs -f job/mirror-<name>
 ```
 
 The Job pulls from HF (SHA256-verified against LFS OIDs, safetensors
@@ -59,8 +59,8 @@ presence marks the mirror complete. Re-running is idempotent; verify
 anytime:
 
 ```sh
-llmops verify s3://<your-bucket>/<org>/<repo>/<sha>/
-llmops list --bucket s3://<your-bucket>
+fornax verify s3://<your-bucket>/<org>/<repo>/<sha>/
+fornax list --bucket s3://<your-bucket>
 ```
 
 Then pin the model in `models/<name>.yaml` (see the configuration
@@ -70,21 +70,21 @@ manifest has a consistent `deploy/<name>/lws.yaml`.
 ## 3. Deploy and serve
 
 ```sh
-kubectl create namespace llmops --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace fornax --dry-run=client -o yaml | kubectl apply -f -
 
 # The runtime reads the manifest from a ConfigMap:
-kubectl -n llmops create configmap kimi-k2-7-code-manifest \
+kubectl -n fornax create configmap kimi-k2-7-code-manifest \
   --from-file=model.yaml=models/kimi-k2.7-code.yaml
 
-kubectl -n llmops apply -f deploy/kimi-k2.7-code/lws.yaml
+kubectl -n fornax apply -f deploy/kimi-k2.7-code/lws.yaml
 ```
 
 Watch startup — the pod stages weights from S3 onto node NVMe, then
 launches the engine:
 
 ```sh
-kubectl -n llmops get pods -w
-kubectl -n llmops logs -f <pod>   # "weights: fetching ..." then "launching sglang"
+kubectl -n fornax get pods -w
+kubectl -n fornax logs -f <pod>   # "weights: fetching ..." then "launching sglang"
 ```
 
 `/readyz` returns 503 during load and 200 when the engine is up
@@ -92,7 +92,7 @@ kubectl -n llmops logs -f <pod>   # "weights: fetching ..." then "launching sgla
 node skip the download entirely). Verify the endpoint:
 
 ```sh
-kubectl -n llmops port-forward svc/kimi-k2-7-code 8000 &
+kubectl -n fornax port-forward svc/kimi-k2-7-code 8000 &
 
 # OpenAI surface (native engine passthrough)
 curl -s localhost:8000/v1/chat/completions -H 'Content-Type: application/json' \
@@ -106,16 +106,16 @@ curl -s localhost:8000/v1/messages -H 'Content-Type: application/json' \
 curl -s localhost:8000/v1/responses -H 'Content-Type: application/json' \
   -d '{"model":"kimi-k2.7-code","input":"hello"}'
 
-# Metrics (engine passthrough + llmops_weights_load_seconds)
-curl -s localhost:8000/metrics | grep llmops
+# Metrics (engine passthrough + fornax_weights_load_seconds)
+curl -s localhost:8000/metrics | grep fornax
 
 # Baseline benchmark (produces the numbers the gateway's cost config needs)
-llmops bench --url http://localhost:8000 --model kimi-k2.7-code \
+fornax bench --url http://localhost:8000 --model kimi-k2.7-code \
   --concurrency 8 --requests 32 --out report.json
 ```
 
 Finally register the in-cluster endpoint
-(`http://<name>.llmops.svc:8000/v1`) as a provider in Lux. Lux is the
+(`http://<name>.fornax.svc:8000/v1`) as a provider in Lux. Lux is the
 only ingress; engine pods are never exposed publicly.
 
 **License gates:** check `license`/`license_note` in the model manifest
@@ -134,19 +134,19 @@ instead. A model opts in with `deploy: bare-metal`; `deploy: k8s` is the
 default, so nothing else changes.
 
 ```sh
-llmops install --manifest models/qwen3.8-27b.yaml --cache-root ~/.models
+fornax install --manifest models/qwen3.8-27b.yaml --cache-root ~/.models
 systemctl enable --now qwen3.8-27b.service
-llmops ps
+fornax ps
 ```
 
-`install` writes the unit and copies the manifest to `/etc/llmops/`. It
+`install` writes the unit and copies the manifest to `/etc/fornax/`. It
 is idempotent by content: a repeated install over an unchanged manifest
 does nothing and does not reload systemd. `--print` renders the unit
 without writing it; `--no-reload` writes the files but leaves systemd
 alone, for staging a unit destined for another machine.
 
-Weights come from local disk (`load: local`). `llmops pull` and
-`llmops freeze` place them under `<cache-root>/<hf_repo>/<revision>`,
+Weights come from local disk (`load: local`). `fornax pull` and
+`fornax freeze` place them under `<cache-root>/<hf_repo>/<revision>`,
 and serving verifies them there against `_manifest.json` without
 copying. No bucket is involved.
 
@@ -163,11 +163,11 @@ can serve either model needs both environments, even though it serves
 one model at a time.
 
 ```sh
-uv venv ~/.venvs/llmops-vllm
-uv pip install --python ~/.venvs/llmops-vllm/bin/python vllm==0.28.0
+uv venv ~/.venvs/fornax-vllm
+uv pip install --python ~/.venvs/fornax-vllm/bin/python vllm==0.28.0
 
-uv venv ~/.venvs/llmops-sglang
-uv pip install --python ~/.venvs/llmops-sglang/bin/python sglang==0.5.18
+uv venv ~/.venvs/fornax-sglang
+uv pip install --python ~/.venvs/fornax-sglang/bin/python sglang==0.5.18
 ```
 
 ### Make the host recoverable before you serve on it
@@ -191,7 +191,7 @@ sudo systemctl daemon-reexec
 
 # 2. Reboot on panic and on out-of-memory, rather than hanging.
 printf 'kernel.panic=10\nkernel.panic_on_oops=1\nvm.panic_on_oom=0\n' \
-  | sudo tee /etc/sysctl.d/99-llmops-recover.conf
+  | sudo tee /etc/sysctl.d/99-fornax-recover.conf
 sudo sysctl --system
 ```
 
@@ -211,7 +211,7 @@ journalctl -k -b -1 | tail -60      # the previous boot, after a crash
 Keep diagnostics out of `/tmp` on such a host — it is cleared on boot,
 which is exactly when you need them.
 
-`llmops serve` refuses a start whose memory fraction plus the checkpoint
+`fornax serve` refuses a start whose memory fraction plus the checkpoint
 it just read would not leave the host a working reserve, so the common
 case is caught before anything allocates. The settings above cover what
 it cannot predict.
@@ -223,8 +223,8 @@ one is fastest depends on the workload — see
 [the practice notes](practice.md#choosing-a-draft-head).
 
 ```sh
-llmops serve   --manifest models/qwen3.8-27b-fast.yaml --speculator dflash2
-llmops install --manifest models/qwen3.8-27b-fast.yaml --speculator dflash2
+fornax serve   --manifest models/qwen3.8-27b-fast.yaml --speculator dflash2
+fornax install --manifest models/qwen3.8-27b-fast.yaml --speculator dflash2
 ```
 
 `install --speculator` pins the choice into the unit, so a restart
@@ -232,8 +232,8 @@ serves what you installed rather than the manifest's default. An unknown
 name fails before anything is written. `--speculator none` serves the
 model with no draft head.
 
-`llmops ps` reports which head each model is running, and every response
-carries `X-LLMOps-Speculator`. Quote it with any throughput number.
+`fornax ps` reports which head each model is running, and every response
+carries `X-Fornax-Speculator`. Quote it with any throughput number.
 
 One GPU serves one model at a time, so changing models or draft heads
 means stopping the running unit first.
@@ -264,10 +264,10 @@ local engine is mlx.
 | `license`, `license_note` | free text | compliance record; gates noted here block Lux exposure |
 | `runtime` | `sglang` \| `vllm` \| `custom` | which engine image; `custom` requires `image:` and serves any container honoring the health contract |
 | `image` | image ref | custom-runtime container (OCR wrappers etc.) |
-| `engine_dialect` | `openai-chat` (default) \| `anthropic-messages` \| `openai-responses` | the wire dialect the engine itself speaks. All three caller surfaces are served whatever it is; the matching one is proxied untouched, the others translate and report what the translation dropped in `X-LLMOps-Compat-Loss` and `llmops_dialect_loss_total` |
+| `engine_dialect` | `openai-chat` (default) \| `anthropic-messages` \| `openai-responses` | the wire dialect the engine itself speaks. All three caller surfaces are served whatever it is; the matching one is proxied untouched, the others translate and report what the translation dropped in `X-Fornax-Compat-Loss` and `fornax_dialect_loss_total` |
 | `deploy` | `k8s` (default) \| `bare-metal` | which deploy artifact the model owns: `deploy/<name>/lws.yaml` or `deploy/<name>/<name>.service`. Never both |
 | `load` | `nvme-cache` (default) \| `s3-stream` \| `local` | staged via node NVMe, vLLM-only direct S3 streaming, or verified in place on the host's disk with no bucket (`s3_prefix` must then be empty) |
-| `speculators` | map of name → `{hf_repo, revision, s3_prefix, license, license_note, args}` | draft-model configurations the model offers; `llmops serve --speculator <name>` selects one. An entry naming an `hf_repo` is a separately published draft head and must pin a revision and state its own license — it is frozen and verified like primary weights. An entry with only `args` selects a head inside the target checkpoint. The draft path is never written here: it resolves to `<cache-root>/<hf_repo>/<revision>` at launch. These `args` are appended **after** the model's own, so they override |
+| `speculators` | map of name → `{hf_repo, revision, s3_prefix, license, license_note, args}` | draft-model configurations the model offers; `fornax serve --speculator <name>` selects one. An entry naming an `hf_repo` is a separately published draft head and must pin a revision and state its own license — it is frozen and verified like primary weights. An entry with only `args` selects a head inside the target checkpoint. The draft path is never written here: it resolves to `<cache-root>/<hf_repo>/<revision>` at launch. These `args` are appended **after** the model's own, so they override |
 | `default_speculator` | a `speculators` key \| `none` | which head runs when the operator names none. Required whenever `speculators` is set |
 | `gpu` | `{type, count, nodes}` | resource shape; must match the LWS manifest (CI-checked) |
 | `context_max` | int | documented context config; pair with the KV-cache args it needs |
@@ -282,18 +282,18 @@ only carries model-specific flags.
 
 | Knob | Default | Purpose |
 |---|---|---|
-| `--manifest` | `/etc/llmops/model.yaml` | manifest path (mounted ConfigMap) |
+| `--manifest` | `/etc/fornax/model.yaml` | manifest path (mounted ConfigMap) |
 | `--port` | 8000 | shim/service port (`/livez`, `/readyz`, `/version`, `/metrics`, and all three caller surfaces: `/v1/chat/completions`, `/v1/messages`, `/v1/responses`) |
 | `--engine-port` | 30000 | engine's internal port |
 | `--cache-root` | `/cache` | NVMe cache mount; keyed by repo+revision, flock-shared across pods on a node |
-| `--speculator` | the manifest's `default_speculator` | which draft head to serve with; `none` disables speculation. Resolved before any weights are touched, and reported on every response as `X-LLMOps-Speculator` |
-| `LLMOPS_ENGINE_CMD` | unset | replace the engine command (`{model}`/`{port}` substituted) — local/dev substitution, e.g. mlx |
-| `LLMOPS_ENGINE_HEALTH_PATH` | `/health` | engine health endpoint, for engines that differ |
+| `--speculator` | the manifest's `default_speculator` | which draft head to serve with; `none` disables speculation. Resolved before any weights are touched, and reported on every response as `X-Fornax-Speculator` |
+| `FORNAX_ENGINE_CMD` | unset | replace the engine command (`{model}`/`{port}` substituted) — local/dev substitution, e.g. mlx |
+| `FORNAX_ENGINE_HEALTH_PATH` | `/health` | engine health endpoint, for engines that differ |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | unset | OTLP collector to export traces, metrics and logs to. Unset, `serve` logs locally and exports nothing |
 
 ### Telemetry
 
-`llmops serve` exports traces, metrics and logs over OTLP. Point it at a
+`fornax serve` exports traces, metrics and logs over OTLP. Point it at a
 collector with the standard environment and everything else follows from
 it:
 
@@ -309,13 +309,13 @@ so a laptop or a bare-metal host needs no collector to run.
 What you get per request: a server span for the caller's request and a
 client span for the engine hop inside it, so a slow completion says
 which half was slow. Health and readiness probes and `/metrics` are not
-traced, since the kubelet and `llmops ps` poll them constantly and would
+traced, since the kubelet and `fornax ps` poll them constantly and would
 bury everything else.
 
-`/metrics` stays a Prometheus text endpoint because `llmops ps` reads
-`llmops_weights_load_seconds` from it. The same three facts also export
-as OTLP instruments: `llmops.weights.load.duration`,
-`llmops.speculator.info` and `llmops.dialect.loss`.
+`/metrics` stays a Prometheus text endpoint because `fornax ps` reads
+`fornax_weights_load_seconds` from it. The same three facts also export
+as OTLP instruments: `fornax.weights.load.duration`,
+`fornax.speculator.info` and `fornax.dialect.loss`.
 
 ### Deploy manifest (`deploy/<name>/lws.yaml`)
 
@@ -324,8 +324,8 @@ as OTLP instruments: `llmops.weights.load.duration`,
 | replicas | `spec.replicas` | whole serving groups (capacity planning, not HPA) |
 | group size | `leaderWorkerTemplate.size` | = `gpu.nodes`; >1 activates multi-node (needs RoCEv2/NCCL) and requires a `workerTemplate` (CI-checked: same image and GPU count as the leader, no probes — only rank 0 serves HTTP) |
 | GPU count/pool | `resources.limits."nvidia.com/gpu"`, `nodeSelector` | must match manifest `gpu` (CI-checked); pool label selects H200 / B200 / B300 |
-| image ref | container `image` | `<REGISTRY>/llmops-runtime-<engine>:<VERSION>` from `make push-images`; registry prefix is free, name must match the manifest runtime (CI-checked) |
-| NVMe cache | `volumes.cache.hostPath` | `/var/cache/llmops`; a prefetch DaemonSet warms it |
+| image ref | container `image` | `<REGISTRY>/fornax-runtime-<engine>:<VERSION>` from `make push-images`; registry prefix is free, name must match the manifest runtime (CI-checked) |
+| NVMe cache | `volumes.cache.hostPath` | `/var/cache/fornax`; a prefetch DaemonSet warms it |
 | `/dev/shm` | `volumes.shm.sizeLimit` | ≥32Gi (vLLM requires it for DeepSeek-V4-class models) |
 | probe budget | `readinessProbe.failureThreshold` | cold start for the big models is minutes — size it accordingly |
 
@@ -341,7 +341,7 @@ as OTLP instruments: `llmops.weights.load.duration`,
 
 - **`/readyz` stuck at 503** — its body names the check; check pod logs: still `weights: fetching`
   (normal on cold start), engine crash (log tail shows the engine's
-  stderr), or a hash mismatch (store corruption → run `llmops verify`).
+  stderr), or a hash mismatch (store corruption → run `fornax verify`).
 - **404 from `/v1/chat/completions`** — model id in the request must be
   the manifest `name` (that's the served model name).
 - **mirror Job fails mid-upload** — re-run it; push is idempotent and

@@ -389,9 +389,9 @@ func traceIDOf(traceparent string) string {
 	return parts[1]
 }
 
-// TestShimExportsGaugesAsInstruments asserts the llmops_* facts reach an OTel
+// TestShimExportsGaugesAsInstruments asserts the fornax_* facts reach an OTel
 // meter as well as the Prometheus text endpoint. The text endpoint stays
-// because `llmops ps` reads llmops_weights_load_seconds out of it, so both
+// because `fornax ps` reads fornax_weights_load_seconds out of it, so both
 // have to hold at once.
 func TestShimExportsGaugesAsInstruments(t *testing.T) {
 	reader := sdkmetric.NewManualReader()
@@ -428,9 +428,9 @@ func TestShimExportsGaugesAsInstruments(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		"llmops.weights.load.duration",
-		"llmops.speculator.info",
-		"llmops.dialect.loss",
+		"fornax.weights.load.duration",
+		"fornax.speculator.info",
+		"fornax.dialect.loss",
 	} {
 		if !got[want] {
 			t.Errorf("instrument %q not collected; got %v", want, got)
@@ -440,7 +440,7 @@ func TestShimExportsGaugesAsInstruments(t *testing.T) {
 	// The text endpoint is the CLI's own API and must still answer.
 	rec := httptest.NewRecorder()
 	s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
-	if !strings.Contains(rec.Body.String(), "llmops_weights_load_seconds 39.2") {
-		t.Fatalf("text endpoint lost the gauge llmops ps reads:\n%s", rec.Body.String())
+	if !strings.Contains(rec.Body.String(), "fornax_weights_load_seconds 39.2") {
+		t.Fatalf("text endpoint lost the gauge fornax ps reads:\n%s", rec.Body.String())
 	}
 }

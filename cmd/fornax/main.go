@@ -1,23 +1,23 @@
 // SPDX-FileCopyrightText: 2026 Latere AI
 // SPDX-License-Identifier: MIT
 
-// Command llmops owns the open-weights inference layer end to end:
+// Command fornax owns the open-weights inference layer end to end:
 // fetching and freezing weights, serving a model, and measuring what is
 // serving (specs/024-single-cli.md).
 //
-//	llmops pull     <hf_repo>[@revision] --dir <dir>
-//	llmops freeze   <hf_repo>@<sha> --dir <dir>
-//	llmops push     <hf_repo>@<sha> --dir <dir> --bucket <s3://bucket | path>
-//	llmops verify   <prefix>
-//	llmops list     --bucket <s3://bucket | path>
-//	llmops serve    --manifest <manifest.yaml>
-//	llmops validate <models-dir | manifest.yaml>
-//	llmops install  --manifest <manifest.yaml>
-//	llmops ps
-//	llmops endpoint --harness claude|codex|opencode
-//	llmops run      claude|codex|opencode --model <name>
-//	llmops bench    --url <base> --model <id>
-//	llmops version
+//	fornax pull     <hf_repo>[@revision] --dir <dir>
+//	fornax freeze   <hf_repo>@<sha> --dir <dir>
+//	fornax push     <hf_repo>@<sha> --dir <dir> --bucket <s3://bucket | path>
+//	fornax verify   <prefix>
+//	fornax list     --bucket <s3://bucket | path>
+//	fornax serve    --manifest <manifest.yaml>
+//	fornax validate <models-dir | manifest.yaml>
+//	fornax install  --manifest <manifest.yaml>
+//	fornax ps
+//	fornax endpoint --harness claude|codex|opencode
+//	fornax run      claude|codex|opencode --model <name>
+//	fornax bench    --url <base> --model <id>
+//	fornax version
 //
 // The verbs are flat. Grouping them under an object would name an
 // implementation rather than an intent, and `pull` is the most-typed of
@@ -32,12 +32,12 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/latere-ai/llmops/internal/mirror"
+	"latere.ai/x/fornax/internal/mirror"
 )
 
 // version and commit are injected at build time by `make dist`. Left
 // empty, they fall back to whatever the Go toolchain stamped, so a
-// `go build` binary still answers `llmops version` honestly.
+// `go build` binary still answers `fornax version` honestly.
 var (
 	version = ""
 	commit  = ""
@@ -47,7 +47,7 @@ func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
-const usage = `usage: llmops <command> [args]
+const usage = `usage: fornax <command> [args]
 
 weights
   pull     <hf_repo>[@revision] --dir <dir>    fetch from Hugging Face
@@ -111,7 +111,7 @@ func run(args []string, out, errw io.Writer) int {
 		}
 	}()
 	if err != nil {
-		_, _ = fmt.Fprintln(errw, "llmops:", err)
+		_, _ = fmt.Fprintln(errw, "fornax:", err)
 		if errors.As(err, &usageErr{}) {
 			return 2
 		}
@@ -134,7 +134,7 @@ func versionString() string {
 	return v + " (" + c + ")"
 }
 
-// buildIdentity is the version and commit `llmops version` prints and the
+// buildIdentity is the version and commit `fornax version` prints and the
 // shim reports on /version: the stamped values, else the module's build
 // info, else "(devel)" with no commit.
 func buildIdentity() (string, string) {
@@ -166,7 +166,7 @@ var dispatch = []string{
 
 func newMirror(errw io.Writer) *mirror.Mirror {
 	hf := mirror.NewHFClient()
-	if base := os.Getenv("LLMOPS_HF_BASE"); base != "" {
+	if base := os.Getenv("FORNAX_HF_BASE"); base != "" {
 		hf.Base = base
 	}
 	return &mirror.Mirror{

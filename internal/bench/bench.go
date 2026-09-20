@@ -147,9 +147,9 @@ func Run(ctx context.Context, cfg Config) (*Report, error) {
 
 // SpeculatorHeader is the response header naming the active draft-model
 // configuration. It mirrors the constant the shim sets; this package is
-// deliberately free of llmops imports so it can be pointed at any
+// deliberately free of fornax imports so it can be pointed at any
 // OpenAI-compatible endpoint, ours or not.
-const SpeculatorHeader = "X-LLMOps-Speculator"
+const SpeculatorHeader = "X-Fornax-Speculator"
 
 // percentile is the nearest-rank method: idx = ceil(p/100 * n) - 1.
 func percentile(sorted []time.Duration, p int) time.Duration {

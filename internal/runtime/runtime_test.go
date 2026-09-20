@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/latere-ai/llmops/internal/manifest"
-	"github.com/latere-ai/llmops/internal/mirror"
+	"latere.ai/x/fornax/internal/manifest"
+	"latere.ai/x/fornax/internal/mirror"
 
 	"latere.ai/x/pkg/wait/waittest"
 )
@@ -347,7 +347,7 @@ func TestShimContract(t *testing.T) {
 	// Metrics: engine passthrough + our gauge.
 	code, body := get("/metrics")
 	if code != 200 || !strings.Contains(body, "engine_requests_total 42") ||
-		!strings.Contains(body, "llmops_weights_load_seconds 3") {
+		!strings.Contains(body, "fornax_weights_load_seconds 3") {
 		t.Fatalf("/metrics = %d %q", code, body)
 	}
 	// Inference paths proxy through.
@@ -363,7 +363,7 @@ func TestShimMetricsEngineDown(t *testing.T) {
 	}
 	rec := httptest.NewRecorder()
 	shim.ServeHTTP(rec, httptest.NewRequest("GET", "/metrics", nil))
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "llmops_weights_load_seconds") {
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "fornax_weights_load_seconds") {
 		t.Fatalf("metrics with engine down = %d %q", rec.Code, rec.Body.String())
 	}
 }
@@ -384,7 +384,7 @@ func TestShimMetricsOmitsEngineErrorBody(t *testing.T) {
 	shim.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
 
 	body := rec.Body.String()
-	if !strings.Contains(body, "llmops_weights_load_seconds") {
+	if !strings.Contains(body, "fornax_weights_load_seconds") {
 		t.Fatalf("runtime gauge missing: %d %q", rec.Code, body)
 	}
 	if strings.Contains(body, "<html>") || strings.Contains(body, "503 Service Unavailable") {
@@ -478,7 +478,7 @@ func TestServeE2E(t *testing.T) {
 	}
 	body, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
-	if !strings.Contains(string(body), "llmops_weights_load_seconds") {
+	if !strings.Contains(string(body), "fornax_weights_load_seconds") {
 		t.Fatalf("metrics missing gauge: %s", body)
 	}
 
@@ -1212,7 +1212,7 @@ func TestShimReportsDialectLoss(t *testing.T) {
 	// to the one caller who hit it.
 	m := httptest.NewRecorder()
 	shim.ServeHTTP(m, httptest.NewRequest("GET", "/metrics", nil))
-	if !strings.Contains(m.Body.String(), "llmops_dialect_loss_total") {
+	if !strings.Contains(m.Body.String(), "fornax_dialect_loss_total") {
 		t.Fatalf("loss not exported as a metric:\n%s", m.Body.String())
 	}
 }

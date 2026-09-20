@@ -17,7 +17,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/latere-ai/llmops/internal/manifest"
+	"latere.ai/x/fornax/internal/manifest"
 )
 
 // DNSName converts a model name to its k8s resource name.
@@ -26,7 +26,7 @@ func DNSName(model string) string { return strings.ReplaceAll(model, ".", "-") }
 // Binary is the installed command a bare-metal unit must run
 // (specs/024). A unit naming anything else would start something that
 // is not this repo's runtime, or nothing at all.
-const Binary = "llmops"
+const Binary = "fornax"
 
 // Validate checks every model manifest against the deploy artifact it
 // owns: a LeaderWorkerSet for deploy: k8s, a systemd unit for
@@ -189,7 +189,7 @@ func validateContainer(m *manifest.Manifest, lws map[string]any, template string
 	default:
 		// Compare the repository component exactly, not by substring:
 		// the registry prefix is the operator's to choose, but
-		// llmops-runtime-sglang and llmops-runtime-sglang-k3 are
+		// fornax-runtime-sglang and fornax-runtime-sglang-k3 are
 		// different engines and each contains the other's prefix.
 		if got, want := imageName(image), m.EngineImage(); got != want {
 			return fmt.Errorf("%s image %q does not match runtime %q: image name %q, want %q",
@@ -215,8 +215,8 @@ func validateContainer(m *manifest.Manifest, lws map[string]any, template string
 }
 
 // imageName reduces an image reference to its repository component:
-// "nexus.example.com:5000/latere/llmops-runtime-sglang:v1" becomes
-// "llmops-runtime-sglang". Registry, port, tag, and digest all drop.
+// "nexus.example.com:5000/latere/fornax-runtime-sglang:v1" becomes
+// "fornax-runtime-sglang". Registry, port, tag, and digest all drop.
 func imageName(ref string) string {
 	name := ref
 	if i := strings.LastIndex(name, "/"); i >= 0 {

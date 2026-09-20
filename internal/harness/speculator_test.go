@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/latere-ai/llmops/internal/runtime"
+	"latere.ai/x/fornax/internal/runtime"
 )
 
 // TestDiscoverReportsTheRunningSpeculator: the manifest offers a set and
@@ -28,7 +28,7 @@ func TestDiscoverReportsTheRunningSpeculator(t *testing.T) {
 		case "/v1/models":
 			_, _ = fmt.Fprint(w, `{"data":[{"id":"qwen"}]}`)
 		default:
-			_, _ = fmt.Fprintln(w, "llmops_weights_load_seconds 12")
+			_, _ = fmt.Fprintln(w, "fornax_weights_load_seconds 12")
 		}
 	}))
 	defer srv.Close()
@@ -77,7 +77,7 @@ func TestDiscoverDropsTheSpeculatorOfAnotherModel(t *testing.T) {
 		case "/v1/models":
 			_, _ = fmt.Fprint(w, `{"data":[{"id":"some-other-model"}]}`)
 		default:
-			_, _ = fmt.Fprintln(w, "llmops_weights_load_seconds 1")
+			_, _ = fmt.Fprintln(w, "fornax_weights_load_seconds 1")
 		}
 	}))
 	defer srv.Close()

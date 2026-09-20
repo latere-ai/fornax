@@ -71,7 +71,7 @@ mode ([[019-gb10-serving-target]]).
 
 1. Every k8s model's `deploy/<model>/lws.yaml` is consistent with its
    manifest — image, GPU count and type, node selector, mounted manifest,
-   probes — checked by `llmops validate` in CI and by
+   probes — checked by `fornax validate` in CI and by
    `internal/deploycheck` in tests. **Holds today for all six.**
 
    This replaces the original "`kustomize build` renders + golden files".

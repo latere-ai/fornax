@@ -1,11 +1,11 @@
 ---
 title: "Rename the model deployment and serving component to Fornax"
-status: draft
+status: partial
 depends_on:
   - 024-single-cli.md
 affects:
   - go.mod
-  - cmd/llmops/
+  - cmd/fornax/
   - internal/
   - deploy/
   - models/
@@ -56,3 +56,13 @@ before applying renamed deployment examples.
   split between product branding and the interfaces developers use.
 - Existing installations remain under operator control. A naming change never
   implicitly moves weights or creates a second live deployment.
+
+## Outcome
+
+The module, command, imports, configuration, and deployment examples use Fornax.
+The existing tests and CPU e2e tests pass. All eight packages exceed 90%
+coverage; all eight model manifests and their deployment artifacts validate.
+The build, format, spec, dependency, cgo-free, and Linux amd64/arm64 distribution
+checks pass. `docs/migration.md` describes how to update existing installations.
+
+Remote repository publication and installation verification remain open.

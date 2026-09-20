@@ -1,9 +1,9 @@
-# The per-push gate configuration for llmops. The checks themselves live in
+# The per-push gate configuration for fornax. The checks themselves live in
 # latere.ai/x/ci-gate, pinned in go.mod, so every one of these runs the same
 # on a laptop as it does on a runner.
 
 cover:
-  trim_prefix: github.com/latere-ai/llmops/
+  trim_prefix: latere.ai/x/fornax/
   exempt: {}
 
 spec:
@@ -32,13 +32,13 @@ depcheck:
   # import arrives on the next `go get`, and the first symptom is otherwise a
   # slower build.
   #
-  # The OpenTelemetry block below is one decision, not eleven. `llmops serve`
+  # The OpenTelemetry block below is one decision, not eleven. `fornax serve`
   # sits on the inference path and exports through latere.ai/x/pkg/otel, whose
   # OTLP exporters pull the protobuf, gRPC and retry modules with them. The
   # entries are listed separately so a module that arrives for some other
   # reason still has to be admitted for that reason.
   packages:
-    github.com/latere-ai/llmops/cmd/llmops:
+    latere.ai/x/fornax/cmd/fornax:
       decision: the CLI ships as a single static binary
       allow:
         gopkg.in/yaml.v3: model manifests and deploy artifacts are YAML

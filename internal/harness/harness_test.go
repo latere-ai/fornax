@@ -116,8 +116,8 @@ func TestOpencodeConfigIsValidJSON(t *testing.T) {
 		t.Fatalf("opencode config is not valid JSON: %v\n%s", err, out)
 	}
 	prov, _ := v["provider"].(map[string]any)
-	llmops, _ := prov["llmops"].(map[string]any)
-	opts, _ := llmops["options"].(map[string]any)
+	fornax, _ := prov["fornax"].(map[string]any)
+	opts, _ := fornax["options"].(map[string]any)
 	if opts["baseURL"] != "http://box:8000/v1" {
 		t.Fatalf("baseURL is %v", opts["baseURL"])
 	}
@@ -133,7 +133,7 @@ func TestCodexConfigNamesTheProvider(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		`model_provider = "llmops"`,
+		`model_provider = "fornax"`,
 		`base_url = "http://box:8000/v1"`,
 		`wire_api = "chat"`,
 	} {

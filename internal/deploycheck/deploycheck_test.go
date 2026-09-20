@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/latere-ai/llmops/internal/install"
-	"github.com/latere-ai/llmops/internal/manifest"
+	"latere.ai/x/fornax/internal/install"
+	"latere.ai/x/fornax/internal/manifest"
 )
 
 // TestRepoConsistency is the real CI gate: every checked-in model
@@ -22,7 +22,7 @@ func TestRepoConsistency(t *testing.T) {
 }
 
 // TestCheckedInUnitsAreGenerated keeps the repo's bare-metal units
-// byte-identical to what `llmops install` writes with default options
+// byte-identical to what `fornax install` writes with default options
 // (specs/020). Validate() checks a unit's *properties*, which leaves
 // room for a checked-in file to drift in ways that still pass; this
 // closes that, and means the file in the tree is a truthful preview of
@@ -48,8 +48,8 @@ func TestCheckedInUnitsAreGenerated(t *testing.T) {
 			continue
 		}
 		if want := install.Unit(m, install.Options{}); string(got) != want {
-			t.Errorf("%s is not what `llmops install` generates; regenerate it with\n"+
-				"  llmops install --manifest models/%s.yaml --print > %s\ngot:\n%s\nwant:\n%s",
+			t.Errorf("%s is not what `fornax install` generates; regenerate it with\n"+
+				"  fornax install --manifest models/%s.yaml --print > %s\ngot:\n%s\nwant:\n%s",
 				path, m.Name, path, got, want)
 		}
 	}
@@ -120,7 +120,7 @@ func writeUnit(t *testing.T, deployDir, model, execStart string) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	body := "[Unit]\nDescription=llmops " + model + "\n\n[Service]\nExecStart=" + execStart +
+	body := "[Unit]\nDescription=fornax " + model + "\n\n[Service]\nExecStart=" + execStart +
 		"\nRestart=on-failure\n\n[Install]\nWantedBy=multi-user.target\n"
 	if err := os.WriteFile(filepath.Join(dir, model+".service"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
@@ -130,12 +130,12 @@ func writeUnit(t *testing.T, deployDir, model, execStart string) {
 func TestValidateBareMetalUnit(t *testing.T) {
 	models, deploy := t.TempDir(), t.TempDir()
 	writeBareMetalModel(t, models, "qwen")
-	writeUnit(t, deploy, "qwen", "/usr/local/bin/llmops serve --manifest /etc/llmops/qwen.yaml")
+	writeUnit(t, deploy, "qwen", "/usr/local/bin/fornax serve --manifest /etc/fornax/qwen.yaml")
 	if err := Validate(models, deploy); err != nil {
 		t.Fatalf("valid bare-metal unit rejected: %v", err)
 	}
 	// systemd units are written both ways; neither is a failure.
-	writeUnit(t, deploy, "qwen", "/usr/local/bin/llmops serve --manifest=/etc/llmops/qwen.yaml")
+	writeUnit(t, deploy, "qwen", "/usr/local/bin/fornax serve --manifest=/etc/fornax/qwen.yaml")
 	if err := Validate(models, deploy); err != nil {
 		t.Fatalf("--manifest= form rejected: %v", err)
 	}
@@ -150,10 +150,10 @@ func TestValidateBareMetalUnitFailures(t *testing.T) {
 		// The specs/024 rename is exactly this failure: a unit left
 		// naming the old binary starts nothing, and does so at boot on
 		// the host rather than in CI.
-		{"stale binary name", "/usr/local/bin/runtime serve --manifest /etc/llmops/qwen.yaml", `want "llmops"`},
-		{"no serve verb", "/usr/local/bin/llmops --manifest /etc/llmops/qwen.yaml", "serve subcommand"},
-		{"wrong manifest", "/usr/local/bin/llmops serve --manifest /etc/llmops/other.yaml", `want "qwen.yaml"`},
-		{"no manifest flag", "/usr/local/bin/llmops serve --cache-root /x", "no --manifest"},
+		{"stale binary name", "/usr/local/bin/runtime serve --manifest /etc/fornax/qwen.yaml", `want "fornax"`},
+		{"no serve verb", "/usr/local/bin/fornax --manifest /etc/fornax/qwen.yaml", "serve subcommand"},
+		{"wrong manifest", "/usr/local/bin/fornax serve --manifest /etc/fornax/other.yaml", `want "qwen.yaml"`},
+		{"no manifest flag", "/usr/local/bin/fornax serve --cache-root /x", "no --manifest"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -176,8 +176,8 @@ func TestValidateRejectsBothArtifacts(t *testing.T) {
 	// unchecked deploy file is how config drifts from what runs.
 	models, deploy := t.TempDir(), t.TempDir()
 	writeBareMetalModel(t, models, "qwen")
-	writeUnit(t, deploy, "qwen", "/usr/local/bin/llmops serve --manifest /etc/llmops/qwen.yaml")
-	writeLWS(t, deploy, "qwen", goodLWS("qwen", "ghcr.io/x/llmops-runtime-vllm:v1", "1"))
+	writeUnit(t, deploy, "qwen", "/usr/local/bin/fornax serve --manifest /etc/fornax/qwen.yaml")
+	writeLWS(t, deploy, "qwen", goodLWS("qwen", "ghcr.io/x/fornax-runtime-vllm:v1", "1"))
 	err := Validate(models, deploy)
 	if err == nil || !strings.Contains(err.Error(), "not both") {
 		t.Fatalf("model with two deploy artifacts accepted: %v", err)
@@ -218,7 +218,7 @@ spec:
 func TestValidateHappyAndCustom(t *testing.T) {
 	models, deploy := t.TempDir(), t.TempDir()
 	writeModel(t, models, "tiny", "sglang", "")
-	writeLWS(t, deploy, "tiny", goodLWS("tiny", "ghcr.io/latere-ai/llmops-runtime-sglang:v0.1.0", "8"))
+	writeLWS(t, deploy, "tiny", goodLWS("tiny", "ghcr.io/latere-ai/fornax-runtime-sglang:v0.1.0", "8"))
 	writeModel(t, models, "ocr", "custom", "")
 	writeLWS(t, deploy, "ocr", goodLWS("ocr", "ghcr.io/latere-ai/custom:v1", "8"))
 	if err := Validate(models, deploy); err != nil {
@@ -236,22 +236,22 @@ func TestValidateFailures(t *testing.T) {
 		{"empty yaml", "\n", "empty yaml"},
 		{"bad yaml", ":\n:", ""},
 		{"no lws doc", "kind: Service\n", "no LeaderWorkerSet"},
-		{"wrong name", goodLWS("other", "ghcr.io/latere-ai/llmops-runtime-sglang:v1", "8"), "metadata.name"},
-		{"wrong image", goodLWS("tiny", "ghcr.io/latere-ai/llmops-runtime-vllm:v1", "8"), "does not match runtime"},
-		{"wrong gpus", goodLWS("tiny", "ghcr.io/latere-ai/llmops-runtime-sglang:v1", "4"), "nvidia.com/gpu"},
+		{"wrong name", goodLWS("other", "ghcr.io/latere-ai/fornax-runtime-sglang:v1", "8"), "metadata.name"},
+		{"wrong image", goodLWS("tiny", "ghcr.io/latere-ai/fornax-runtime-vllm:v1", "8"), "does not match runtime"},
+		{"wrong gpus", goodLWS("tiny", "ghcr.io/latere-ai/fornax-runtime-sglang:v1", "4"), "nvidia.com/gpu"},
 		{
 			"wrong size",
-			strings.Replace(goodLWS("tiny", "ghcr.io/latere-ai/llmops-runtime-sglang:v1", "8"), "size: 1", "size: 2", 1),
+			strings.Replace(goodLWS("tiny", "ghcr.io/latere-ai/fornax-runtime-sglang:v1", "8"), "size: 1", "size: 2", 1),
 			"size",
 		},
 		{
 			"wrong ready path",
-			strings.Replace(goodLWS("tiny", "ghcr.io/latere-ai/llmops-runtime-sglang:v1", "8"), "/readyz", "/ready", 1),
+			strings.Replace(goodLWS("tiny", "ghcr.io/latere-ai/fornax-runtime-sglang:v1", "8"), "/readyz", "/ready", 1),
 			"readinessProbe",
 		},
 		{
 			"wrong live path",
-			strings.Replace(goodLWS("tiny", "ghcr.io/latere-ai/llmops-runtime-sglang:v1", "8"), "/livez", "/healthz", 1),
+			strings.Replace(goodLWS("tiny", "ghcr.io/latere-ai/fornax-runtime-sglang:v1", "8"), "/livez", "/healthz", 1),
 			"livenessProbe",
 		},
 		{
@@ -328,7 +328,7 @@ spec:
 }
 
 func TestValidateMultiNode(t *testing.T) {
-	const good = "ghcr.io/latere-ai/llmops-runtime-sglang:v0.1.0"
+	const good = "ghcr.io/latere-ai/fornax-runtime-sglang:v0.1.0"
 
 	t.Run("consistent worker passes", func(t *testing.T) {
 		models, deploy := t.TempDir(), t.TempDir()
@@ -353,7 +353,7 @@ func TestValidateMultiNode(t *testing.T) {
 		},
 		{
 			"worker on the wrong engine image",
-			multiNodeLWS("big", good, "ghcr.io/latere-ai/llmops-runtime-vllm:v0.1.0", "8"),
+			multiNodeLWS("big", good, "ghcr.io/latere-ai/fornax-runtime-vllm:v0.1.0", "8"),
 			"workerTemplate image",
 		},
 		{
@@ -389,7 +389,7 @@ func TestValidateMultiNode(t *testing.T) {
 		models, deploy := t.TempDir(), t.TempDir()
 		writeModel(t, models, "tiny", "sglang", "")
 		writeLWS(t, deploy, "tiny", strings.Replace(
-			multiNodeLWS("tiny", good, "ghcr.io/latere-ai/llmops-runtime-vllm:v1", "4"), "size: 2", "size: 1", 1))
+			multiNodeLWS("tiny", good, "ghcr.io/latere-ai/fornax-runtime-vllm:v1", "4"), "size: 2", "size: 1", 1))
 		if err := Validate(models, deploy); err != nil {
 			t.Fatal(err)
 		}
@@ -418,8 +418,8 @@ func writeK3Model(t *testing.T, dir, name string) {
 // and they are not interchangeable — K3 needs the CUDA 13 branch build,
 // and the shared image must not inherit its r580+ driver floor.
 func TestValidateEngineImageIsNotSubstringMatched(t *testing.T) {
-	const shared = "ghcr.io/latere-ai/llmops-runtime-sglang:v0.1.0"
-	const k3 = "ghcr.io/latere-ai/llmops-runtime-sglang-k3:v0.1.0"
+	const shared = "ghcr.io/latere-ai/fornax-runtime-sglang:v0.1.0"
+	const k3 = "ghcr.io/latere-ai/fornax-runtime-sglang-k3:v0.1.0"
 
 	cases := []struct {
 		name    string
@@ -464,9 +464,9 @@ func TestValidateEngineImageIsNotSubstringMatched(t *testing.T) {
 	// The registry prefix stays the operator's choice.
 	t.Run("any registry prefix passes", func(t *testing.T) {
 		for _, image := range []string{
-			"llmops-runtime-sglang:v1",
-			"nexus.example.com:5000/latere/llmops-runtime-sglang:v1",
-			"123.dkr.ecr.eu-central-1.amazonaws.com/latere/llmops-runtime-sglang@sha256:abc",
+			"fornax-runtime-sglang:v1",
+			"nexus.example.com:5000/latere/fornax-runtime-sglang:v1",
+			"123.dkr.ecr.eu-central-1.amazonaws.com/latere/fornax-runtime-sglang@sha256:abc",
 		} {
 			models, deploy := t.TempDir(), t.TempDir()
 			writeModel(t, models, "m", "sglang", "")
@@ -480,10 +480,10 @@ func TestValidateEngineImageIsNotSubstringMatched(t *testing.T) {
 
 func TestImageName(t *testing.T) {
 	cases := map[string]string{
-		"llmops-runtime-sglang":                     "llmops-runtime-sglang",
-		"llmops-runtime-sglang:v1":                  "llmops-runtime-sglang",
-		"ghcr.io/latere-ai/llmops-runtime-vllm:dev": "llmops-runtime-vllm",
-		"nexus.example.com:5000/x/llmops-mirror:v1": "llmops-mirror",
+		"fornax-runtime-sglang":                     "fornax-runtime-sglang",
+		"fornax-runtime-sglang:v1":                  "fornax-runtime-sglang",
+		"ghcr.io/latere-ai/fornax-runtime-vllm:dev": "fornax-runtime-vllm",
+		"nexus.example.com:5000/x/fornax-mirror:v1": "fornax-mirror",
 		"repo/name@sha256:deadbeef":                 "name",
 		"":                                          "",
 	}

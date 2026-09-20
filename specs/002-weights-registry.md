@@ -5,7 +5,7 @@ depends_on:
   - 000-architecture.md
 affects:
   - internal/mirror/
-  - cmd/llmops/
+  - cmd/fornax/
   - models/
 effort: medium
 created: 2026-07-18
@@ -48,25 +48,25 @@ s3://latere-models/<hf_org>/<hf_name>/<hf_revision_sha>/
   per-file `{path, size, sha256}`. HF LFS OIDs are SHA256 — verify at mirror
   time without re-hashing the source.
 
-## Mirror subcommands (`internal/mirror`, driven from `cmd/llmops`)
+## Mirror subcommands (`internal/mirror`, driven from `cmd/fornax`)
 
-Go, no cgo. Five subcommands of the one `llmops` binary
+Go, no cgo. Five subcommands of the one `fornax` binary
 ([[024-single-cli]]) rather than a separate tool:
 
-1. `llmops pull <hf_repo>[@revision]` — resolve revision to SHA; download via
+1. `fornax pull <hf_repo>[@revision]` — resolve revision to SHA; download via
    `hf download` with `hf_transfer` enabled; **safetensors-only policy**
    (reject pickle/bin), failing closed on an unknown extension; verify
    SHA256 against HF LFS OIDs.
-2. `llmops freeze <hf_repo>@<sha> --dir <dir>` — write `_manifest.json` into
+2. `fornax freeze <hf_repo>@<sha> --dir <dir>` — write `_manifest.json` into
    a directory that already holds the files, so a host that serves from its
    own disk gets the same freeze guarantee with no upload
    ([[021-local-weight-loading]]).
-3. `llmops push` — upload with `s5cmd` to the revision-pinned prefix; write
+3. `fornax push` — upload with `s5cmd` to the revision-pinned prefix; write
    `_manifest.json` last (its presence = mirror complete/atomic).
-4. `llmops verify <prefix>` — re-hash every file against the manifest.
+4. `fornax verify <prefix>` — re-hash every file against the manifest.
    Takes an `s3://` URI or a plain path; the store type is resolved from
    the argument.
-5. `llmops list` — list mirrored models/revisions.
+5. `fornax list` — list mirrored models/revisions.
 
 Runs as a k8s Job (needs bandwidth + scratch disk), also runnable
 locally. `deploy/mirror/job.yaml` is the parameterized Job
@@ -106,10 +106,10 @@ concrete — they add ~4 TB and serve no inference purpose.
 
 ## Acceptance criteria
 
-1. `llmops pull && llmops push` on a small test repo (<5 GB) produces a
+1. `fornax pull && fornax push` on a small test repo (<5 GB) produces a
    revision-pinned prefix with a valid `_manifest.json`; re-running is
    idempotent (no re-upload of verified files).
-2. `llmops verify` detects a corrupted/truncated file (e2e test with injected
+2. `fornax verify` detects a corrupted/truncated file (e2e test with injected
    corruption).
 3. Non-safetensors weight files are rejected with a clear error (test).
 4. All six S3-served repos above mirrored; sizes and SHA256 manifests
@@ -135,7 +135,7 @@ concrete — they add ~4 TB and serve no inference purpose.
 
 ## Verification
 
-- Unit + e2e tests in `internal/mirror` and `cmd/llmops` (corruption,
+- Unit + e2e tests in `internal/mirror` and `cmd/fornax` (corruption,
   idempotency, policy), plus the full-stack local run in
   [[011-local-e2e]] against MinIO.
 - One full-size mirror timed and documented (expected: hours at multi-Gbps;

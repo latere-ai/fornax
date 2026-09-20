@@ -19,7 +19,7 @@ dispatched_task_id: null
 
 ## Overview
 
-First Python code in this repo: `lens/` (package `llmops-jlens`,
+First Python code in this repo: `lens/` (package `fornax-jlens`,
 managed with `uv` like `e2e/local/.venv`) fits a **Jacobian lens** for
 a model+revision and publishes it as a versioned artifact next to the
 frozen weights in S3. The lens is the offline half of real-time jspace
@@ -51,7 +51,7 @@ pipeline on the [[011-local-e2e]] stack (Qwen3-0.6B @
 ```
 lens/
   pyproject.toml           # uv-managed; python 3.12; entry point: jlens
-  src/llmops_jlens/
+  src/fornax_jlens/
     fitting.py             # VJP estimator, merge, checkpointing
     artifact.py            # save/load/verify (safetensors + lens.json)
     convert.py             # upstream jacobian-lens .pt importer
@@ -98,7 +98,7 @@ subsystems, so fit-time and serve-time code share `artifact.py`.
                               # config, per-tensor sha256, pkg version
    ```
 
-   Note: `_manifest.json` is written at `llmops push` time and is
+   Note: `_manifest.json` is written at `fornax push` time and is
    frozen — lens files are deliberately **not** added to it. The
    artifact is self-verifying via `lens.json` hashes; the runtime
    fetches it in a separate prep step ([[013-inengine-capture]]'s
@@ -144,7 +144,7 @@ subsystems, so fit-time and serve-time code share `artifact.py`.
 6. Same corpus + seed ⇒ byte-identical `lens.json` tensor hashes
    across two runs (determinism test).
 7. `make test-lens` (pytest + coverage) gates ≥90% for
-   `src/llmops_jlens/` fit-side modules, wired into CI beside the Go
+   `src/fornax_jlens/` fit-side modules, wired into CI beside the Go
    `cover` target.
 
 ## Non-goals

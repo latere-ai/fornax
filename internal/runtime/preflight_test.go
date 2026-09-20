@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/latere-ai/llmops/internal/manifest"
+	"latere.ai/x/fornax/internal/manifest"
 )
 
 // fakeMeminfo points the preflight at a synthetic pool so the test runs

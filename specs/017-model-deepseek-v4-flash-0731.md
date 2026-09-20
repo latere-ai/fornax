@@ -80,7 +80,7 @@ worth doing when a second model needs it — Future, not here.
 ## Acceptance criteria
 
 1. Mirrored to S3 at the pinned revision with `_manifest.json` written
-   and `llmops verify` clean ([[002-weights-registry]] AC4).
+   and `fornax verify` clean ([[002-weights-registry]] AC4).
 2. `models/deepseek-v4-flash-0731.yaml` validates: `sglang`, b200 x8 x1,
    TP8, DSpark on, `deepseek-v4`/`deepseekv4` parsers,
    `--trust-remote-code`.
@@ -115,7 +115,7 @@ worth doing when a second model needs it — Future, not here.
    `--speculative-algorithm DSPARK`, each leg with its own
    `--flush-cache` — reporting P50/P99 TTFT, TPOT, accepted length, and
    total throughput. DSpark stays on only if that comparison earns it.
-7. Registered in Lux as `llmops/deepseek-v4-flash-0731`; cost per 1M
+7. Registered in Lux as `fornax/deepseek-v4-flash-0731`; cost per 1M
    tokens derived from AC6's measured throughput.
 
 ## Naming

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/latere-ai/llmops/internal/manifest"
+	"latere.ai/x/fornax/internal/manifest"
 )
 
 const sha = "0123456789abcdef0123456789abcdef01234567"
@@ -81,7 +81,7 @@ func TestRunIsIdempotent(t *testing.T) {
 	m, p := bareMetalManifest(t, src)
 	root := t.TempDir()
 	opts := Options{
-		BinPath:   filepath.Join(root, "bin", "llmops"),
+		BinPath:   filepath.Join(root, "bin", "fornax"),
 		ConfigDir: filepath.Join(root, "etc"),
 		UnitDir:   filepath.Join(root, "units"),
 	}
@@ -150,7 +150,7 @@ func TestRunUpdatesChangedManifest(t *testing.T) {
 	m, p := bareMetalManifest(t, src)
 	root := t.TempDir()
 	opts := Options{
-		BinPath:   filepath.Join(root, "bin", "llmops"),
+		BinPath:   filepath.Join(root, "bin", "fornax"),
 		ConfigDir: filepath.Join(root, "etc"),
 		UnitDir:   filepath.Join(root, "units"),
 		Reload:    func(io.Writer) error { return nil },

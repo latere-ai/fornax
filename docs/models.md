@@ -1,6 +1,6 @@
 # Models
 
-The models Latere serves with llmops — several still blocked, as the
+The models Latere serves with Fornax — several still blocked, as the
 notes column says. Nothing here is a property of the tool: a model is a
 manifest under [`models/`](../models), and the registry is whatever set
 of manifests a deployment checks in.
@@ -44,13 +44,13 @@ one the engine speaks natively.
 | `/v1/messages` | Anthropic Messages | the path an unmodified Anthropic SDK requests |
 | `/v1/responses` | OpenAI Responses | |
 | `/livez`, `/readyz`, `/version` | — | `/readyz` waits for verified weights *and* engine health and names the failing check; `/healthz` and `/ready` stay as aliases for one release |
-| `/metrics` | — | engine Prometheus output plus `llmops_*` |
+| `/metrics` | — | engine Prometheus output plus `fornax_*` |
 
 A caller dialect that matches the engine's own is proxied untouched. The
 rest translate through [`latere.ai/x/pkg/llmdialect`](https://github.com/latere-ai/pkg),
 which reports every request field the translation could not carry. That
-report is returned in the `X-LLMOps-Compat-Loss` header and counted in
-`llmops_dialect_loss_total`, so a lossy pairing is visible rather than
+report is returned in the `X-Fornax-Compat-Loss` header and counted in
+`fornax_dialect_loss_total`, so a lossy pairing is visible rather than
 silent. The engine's own dialect is declared per manifest in
 `engine_dialect` and defaults to `openai-chat`.
 
@@ -61,12 +61,12 @@ gateway, which embeds the same translator package.
 
 1. Write `models/<name>.yaml`: pinned `hf_repo` + `revision`, weight
    `format`, `runtime`, `gpu`, `context_max`, `deploy`, `load`.
-2. Freeze the weights — [deploy guide](./deploy.md), or `llmops pull` +
-   `llmops freeze` for a host that serves from its own disk.
+2. Freeze the weights — [deploy guide](./deploy.md), or `fornax pull` +
+   `fornax freeze` for a host that serves from its own disk.
 3. Add the deploy artifact the mode owns: a LeaderWorkerSet under
-   `deploy/<name>/` for k8s, or the unit `llmops install` generates for
+   `deploy/<name>/` for k8s, or the unit `fornax install` generates for
    bare-metal.
-4. `llmops validate models/` — it checks the manifest *and* that the
+4. `fornax validate models/` — it checks the manifest *and* that the
    artifact matches it. CI runs the same check.
 
 Whether the model belongs on that GPU at all is a separate question:

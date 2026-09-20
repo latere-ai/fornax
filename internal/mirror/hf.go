@@ -40,7 +40,7 @@ func NewHFClient() *HFClient {
 }
 
 // get issues one Hub request under the caller's context, so a cancelled
-// `llmops weights` stops the metadata fetch instead of running it out.
+// `fornax weights` stops the metadata fetch instead of running it out.
 func (c *HFClient) get(ctx context.Context, url string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

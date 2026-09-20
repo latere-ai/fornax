@@ -15,8 +15,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/latere-ai/llmops/internal/harness"
-	"github.com/latere-ai/llmops/internal/install"
+	"latere.ai/x/fornax/internal/harness"
+	"latere.ai/x/fornax/internal/install"
 
 	"context"
 	"errors"
@@ -57,7 +57,7 @@ func runPS(rest []string, out, errw io.Writer) error {
 	asJSON := fs.Bool("json", false, "emit JSON instead of a table")
 	timeout := fs.Duration("timeout", 2*time.Second, "per-model probe timeout")
 	if err := fs.Parse(rest); err != nil {
-		return usagef("usage: llmops ps [--json]")
+		return usagef("usage: fornax ps [--json]")
 	}
 	models, err := harness.Discover(context.Background(), *configDir, *unitDir, *timeout)
 	if err != nil {
@@ -122,7 +122,7 @@ func runEndpoint(rest []string, out, errw io.Writer) error {
 	token := fs.String("token", defaultToken, "token to emit; the endpoint has no auth")
 	timeout := fs.Duration("timeout", 2*time.Second, "per-model probe timeout")
 	if err := fs.Parse(rest); err != nil || *name == "" {
-		return usagef("usage: llmops endpoint --harness <%s> [--model <name>]",
+		return usagef("usage: fornax endpoint --harness <%s> [--model <name>]",
 			strings.Join(harness.Names(), "|"))
 	}
 	h, err := harness.Lookup(*name)
@@ -150,7 +150,7 @@ func runEndpoint(rest []string, out, errw io.Writer) error {
 		return err
 	}
 
-	// Warnings go to stderr so `eval "$(llmops endpoint …)"` stays clean.
+	// Warnings go to stderr so `eval "$(fornax endpoint …)"` stays clean.
 	_, _ = fmt.Fprintf(errw, "# %s is unauthenticated; the token below is a placeholder (specs/026)\n", ep.BaseURL)
 	if !m.Ready() {
 		_, _ = fmt.Fprintf(errw, "# warning: %s is %s, not ready\n", m.Name, m.State)
@@ -183,7 +183,7 @@ func runHarness(rest []string, out, errw io.Writer) error {
 	wait := fs.Duration("wait", 0, "wait this long for a loading model to become ready")
 	timeout := fs.Duration("timeout", 2*time.Second, "per-model probe timeout")
 	if err := fs.Parse(flags); err != nil || name == "" {
-		return usagef("usage: llmops run <%s> [--model <name>] [-- harness args]",
+		return usagef("usage: fornax run <%s> [--model <name>] [-- harness args]",
 			strings.Join(harness.Names(), "|"))
 	}
 	h, err := harness.Lookup(name)
@@ -210,7 +210,7 @@ func runHarness(rest []string, out, errw io.Writer) error {
 		env = append(env, kv[0]+"="+kv[1])
 	}
 	if h.ConfigFile != "" {
-		_, _ = fmt.Fprintf(errw, "# %s also reads %s; `llmops endpoint --harness %s` prints it\n",
+		_, _ = fmt.Fprintf(errw, "# %s also reads %s; `fornax endpoint --harness %s` prints it\n",
 			h.Name, h.ConfigFile, h.Name)
 	}
 	// Replace this process: signals, exit codes and the terminal then

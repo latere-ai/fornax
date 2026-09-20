@@ -56,7 +56,7 @@ const (
 // Deploy modes accepted in the `deploy` field (specs/020). The mode
 // selects how the process is started and which deploy artifact the
 // model owns, not how it serves — both modes run the same
-// `llmops serve` entrypoint against the same schema.
+// `fornax serve` entrypoint against the same schema.
 //
 // It is an explicit field rather than something inferred from gpu.type:
 // deploy mode and hardware are independent axes, and inferring would
@@ -172,7 +172,7 @@ type Manifest struct {
 	SystemPrompt  *SystemPrompt `yaml:"system_prompt,omitempty"`
 
 	// Speculators are the draft-model configurations this model offers,
-	// keyed by the name `llmops serve --speculator` selects.
+	// keyed by the name `fornax serve --speculator` selects.
 	Speculators map[string]Speculator `yaml:"speculators,omitempty"`
 	// DefaultSpeculator is the one used when the operator names none.
 	// Required whenever Speculators is non-empty, and allowed to be
@@ -207,7 +207,7 @@ const specDSpark = "DSPARK"
 // build with an r580+ driver floor, so the K3 image and the shared
 // SGLang image are not substitutable in either direction (specs/018 AC4).
 var engineImages = map[string]string{
-	"moonshotai/Kimi-K3": "llmops-runtime-sglang-k3",
+	"moonshotai/Kimi-K3": "fornax-runtime-sglang-k3",
 }
 
 // EngineImage is the image name a deploy must reference for this model,
@@ -220,7 +220,7 @@ func (m *Manifest) EngineImage() string {
 	if img, ok := engineImages[m.HFRepo]; ok {
 		return img
 	}
-	return "llmops-runtime-" + m.Runtime
+	return "fornax-runtime-" + m.Runtime
 }
 
 // Dialect is the wire dialect the engine speaks, defaulting to OpenAI
@@ -597,7 +597,7 @@ func (s Speculator) validateWeightSource(load string) error {
 }
 
 // draftPathFlag is the SGLang flag naming a separate draft checkpoint.
-// llmops always supplies it, never the manifest — see validateDSpark.
+// fornax always supplies it, never the manifest — see validateDSpark.
 const draftPathFlag = "--speculative-draft-model-path"
 
 // validateSpeculation checks every way this model can be started: its

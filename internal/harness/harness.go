@@ -92,12 +92,12 @@ var Registry = []Harness{
 		},
 		ConfigFile:   "~/.codex/config.toml",
 		ConfigFormat: FormatTOML,
-		ConfigTmpl: `# llmops: {{.Model}}
+		ConfigTmpl: `# fornax: {{.Model}}
 model = "{{.Model}}"
-model_provider = "llmops"
+model_provider = "fornax"
 
-[model_providers.llmops]
-name = "llmops"
+[model_providers.fornax]
+name = "fornax"
 base_url = "{{.BaseURL}}"
 env_key = "OPENAI_API_KEY"
 wire_api = "chat"
@@ -111,18 +111,18 @@ wire_api = "chat"
 		// provider block is the only way in. The key is interpolated
 		// from the environment so the file stays committable.
 		Env: []Var{
-			{"LLMOPS_API_KEY", "{{.Token}}"},
+			{"FORNAX_API_KEY", "{{.Token}}"},
 		},
 		ConfigFile:   "opencode.json",
 		ConfigFormat: FormatJSON,
 		ConfigTmpl: `{
   "provider": {
-    "llmops": {
+    "fornax": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "llmops",
+      "name": "fornax",
       "options": {
         "baseURL": "{{.BaseURL}}",
-        "apiKey": "{env:LLMOPS_API_KEY}"
+        "apiKey": "{env:FORNAX_API_KEY}"
       },
       "models": {
         "{{.Model}}": { "name": "{{.Model}}" }

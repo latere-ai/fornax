@@ -24,7 +24,7 @@ S3-protocol store (MinIO in Docker — the same wire protocol the
 production bucket and `deploy/mirror/job.yaml` will use, exercising
 `S3_ENDPOINT_URL` + s5cmd), and a real local engine (`mlx_lm server` on
 Apple silicon, OpenAI-compatible) standing in for SGLang via the
-runtime's `LLMOPS_ENGINE_CMD` override. The CI fakes prove logic;
+runtime's `FORNAX_ENGINE_CMD` override. The CI fakes prove logic;
 this proves the integrations the fakes stub out.
 
 ## Scope
@@ -32,17 +32,17 @@ this proves the integrations the fakes stub out.
 `e2e/local/run.sh` drives, and tears down, the full chain:
 
 1. MinIO container up; `latere-models` bucket created.
-2. `llmops pull Qwen/Qwen3-0.6B@<pinned sha>` → real HF download,
+2. `fornax pull Qwen/Qwen3-0.6B@<pinned sha>` → real HF download,
    SHA256 verification against LFS OIDs.
-3. `llmops push` → s5cmd upload to MinIO; `llmops verify` re-hashes
-   from the store; `llmops list` shows the revision.
-4. `llmops serve` with `e2e/local/qwen3-0.6b.yaml` (a real manifest:
+3. `fornax push` → s5cmd upload to MinIO; `fornax verify` re-hashes
+   from the store; `fornax list` shows the revision.
+4. `fornax serve` with `e2e/local/qwen3-0.6b.yaml` (a real manifest:
    pinned revision, `system_prompt` enforced) — weights staged from
    MinIO into a local cache dir, engine launched via
-   `LLMOPS_ENGINE_CMD` (mlx_lm), `/ready` flips.
+   `FORNAX_ENGINE_CMD` (mlx_lm), `/ready` flips.
 5. Assertions: `/v1/chat/completions` (non-stream + stream) returns
    model output; `/v1/messages` returns an Anthropic-shaped
-   response; `/metrics` exposes `llmops_weights_load_seconds`;
+   response; `/metrics` exposes `fornax_weights_load_seconds`;
    system-prompt enforcement observable in output.
    Agentic surface: reasoning content (thinking enabled per-request via
    `chat_template_kwargs`), an OpenAI tool call (`tool_calls` with the
@@ -56,14 +56,14 @@ this proves the integrations the fakes stub out.
 ## Engine health-path note
 
 `mlx_lm server` may not expose `/health` (SGLang/vLLM do). The shim's
-engine health path becomes overridable via `LLMOPS_ENGINE_HEALTH_PATH`
+engine health path becomes overridable via `FORNAX_ENGINE_HEALTH_PATH`
 (default `/health`) — test-covered.
 
 ## Acceptance criteria
 
 1. `make e2e-local` runs the chain above green on a clean machine with
    Docker + uv (script bootstraps the venv), no cloud credentials.
-2. The manifest used is validated by the same `llmops validate` as
+2. The manifest used is validated by the same `fornax validate` as
    production manifests (local engine substitution happens via env, not
    schema loosening).
 3. Total cost: $0; runtime a few minutes after the one-time model

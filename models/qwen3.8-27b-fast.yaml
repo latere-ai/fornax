@@ -80,7 +80,7 @@ args:
 # Which draft head wins depends on what is being generated, so the
 # choice is the operator's at start time:
 #
-#   llmops serve --manifest models/qwen3.8-27b-fast.yaml --speculator dflash2
+#   fornax serve --manifest models/qwen3.8-27b-fast.yaml --speculator dflash2
 #
 #   speculator   code    prose   head
 #   dspark       51.5    18.3    2.7 GB, separately published

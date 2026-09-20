@@ -11,7 +11,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/latere-ai/llmops/internal/bench"
+	"latere.ai/x/fornax/internal/bench"
 )
 
 // runBench load-tests a live endpoint and writes a JSON report
@@ -27,7 +27,7 @@ func runBench(rest []string, out, errw io.Writer) error {
 	prompt := fs.String("prompt", "Explain what a mutex is in two sentences.", "prompt")
 	outPath := fs.String("out", "", "write JSON report to file (default stdout)")
 	if err := fs.Parse(rest); err != nil {
-		return usagef("usage: llmops bench --url <base> --model <id>")
+		return usagef("usage: fornax bench --url <base> --model <id>")
 	}
 	rep, err := bench.Run(context.Background(), bench.Config{
 		BaseURL:     *url,

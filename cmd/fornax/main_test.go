@@ -21,7 +21,7 @@ func TestUsageListsEverySubcommand(t *testing.T) {
 	if code := run(nil, &out, &errw); code != 2 {
 		t.Errorf("no arguments: exit %d, want 2", code)
 	}
-	if !strings.Contains(errw.String(), "usage: llmops") {
+	if !strings.Contains(errw.String(), "usage: fornax") {
 		t.Errorf("no arguments did not print usage: %q", errw.String())
 	}
 }

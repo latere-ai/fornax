@@ -1,6 +1,6 @@
-# llmops
+# Fornax
 
-[![ci](https://github.com/latere-ai/llmops/actions/workflows/ci.yml/badge.svg)](https://github.com/latere-ai/llmops/actions/workflows/ci.yml)
+[![ci](https://github.com/latere-ai/fornax/actions/workflows/ci.yml/badge.svg)](https://github.com/latere-ai/fornax/actions/workflows/ci.yml)
 [![go](https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white)](go.mod)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
@@ -15,16 +15,16 @@ for a single-GPU host with no cluster around it.
 
 ```mermaid
 flowchart LR
-  HF["Hugging Face<br/>repo@revision"] -->|llmops pull| Store["frozen store<br/>per-file checksums"]
-  Store -->|llmops push / verify| S3["S3 prefix<br/>or local disk"]
-  S3 --> Serve["llmops serve<br/>weights → engine → shim"]
+  HF["Hugging Face<br/>repo@revision"] -->|fornax pull| Store["frozen store<br/>per-file checksums"]
+  Store -->|fornax push / verify| S3["S3 prefix<br/>or local disk"]
+  S3 --> Serve["fornax serve<br/>weights → engine → shim"]
   Manifest["models/name.yaml"] --> Serve
-  Manifest -->|llmops install| Unit["systemd unit"]
+  Manifest -->|fornax install| Unit["systemd unit"]
   Manifest --> LWS["k8s LeaderWorkerSet"]
   Unit --> Serve
   LWS --> Serve
   Serve --> API["/v1/chat/completions<br/>/v1/messages<br/>/v1/responses"]
-  API -->|llmops bench| Report["latency + throughput"]
+  API -->|fornax bench| Report["latency + throughput"]
 ```
 
 ## Why run it yourself
@@ -46,22 +46,26 @@ flowchart LR
 
 ## Quick start
 
+Install the command with `go install latere.ai/x/fornax/cmd/fornax@main`.
+Upgrading from llmops? Read the [migration guide](docs/migration.md) for
+configuration names, existing caches, and deployment paths.
+
 Go 1.27 or newer, no cgo, no other build dependency:
 
 ```sh
-git clone https://github.com/latere-ai/llmops.git
-cd llmops
+git clone https://github.com/latere-ai/fornax.git
+cd fornax
 make build                       # compile everything
-go install ./cmd/llmops          # puts llmops on your $PATH
+go install ./cmd/fornax          # puts fornax on your $PATH
 ```
 
 Freeze a model onto a host's own disk, then serve it:
 
 ```sh
-llmops pull   Qwen/Qwen3.8-27B@<sha> --dir ~/.models/Qwen/Qwen3.8-27B/<sha>
-llmops freeze Qwen/Qwen3.8-27B@<sha> --dir ~/.models/Qwen/Qwen3.8-27B/<sha>
-llmops validate models/
-llmops serve --manifest models/qwen3.8-27b.yaml --cache-root ~/.models
+fornax pull   Qwen/Qwen3.8-27B@<sha> --dir ~/.models/Qwen/Qwen3.8-27B/<sha>
+fornax freeze Qwen/Qwen3.8-27B@<sha> --dir ~/.models/Qwen/Qwen3.8-27B/<sha>
+fornax validate models/
+fornax serve --manifest models/qwen3.8-27b.yaml --cache-root ~/.models
 ```
 
 For a fleet, the weights go to any s5cmd-reachable bucket — AWS S3, DO
@@ -69,9 +73,9 @@ Spaces, R2 and MinIO all work — and the same `serve` runs as the
 container entrypoint:
 
 ```sh
-llmops push moonshotai/Kimi-K2.7-Code@<sha> \
+fornax push moonshotai/Kimi-K2.7-Code@<sha> \
     --dir /scratch/kimi --bucket s3://<your-bucket>
-llmops verify s3://<your-bucket>/moonshotai/Kimi-K2.7-Code/<sha>/
+fornax verify s3://<your-bucket>/moonshotai/Kimi-K2.7-Code/<sha>/
 ```
 
 Ask the endpoint anything an OpenAI or Anthropic client can ask:
@@ -81,23 +85,23 @@ curl -s localhost:8000/v1/messages -H 'Content-Type: application/json' \
   -d '{"model":"qwen3.8-27b","max_tokens":64,
        "messages":[{"role":"user","content":"hello"}]}'
 
-llmops bench --url http://localhost:8000 --model qwen3.8-27b \
+fornax bench --url http://localhost:8000 --model qwen3.8-27b \
     --concurrency 8 --requests 32 --out report.json
 ```
 
 ## Commands
 
 ```
-llmops pull     <hf_repo>[@revision] --dir <dir>    fetch from Hugging Face
-llmops freeze   <hf_repo>@<sha> --dir <dir>         write the store manifest in place
-llmops push     <hf_repo>@<sha> --dir <dir> --bucket <root>
-llmops verify   <prefix>                            check a store against its manifest
-llmops list     --bucket <root>                     what is mirrored there
-llmops serve    --manifest <manifest.yaml>          run a model
-llmops validate <models-dir | manifest.yaml>        check manifests and deploys
-llmops install  --manifest <manifest.yaml>          place the unit + manifest on a host
-llmops bench    --url <base> --model <id>           measure a live endpoint
-llmops version
+fornax pull     <hf_repo>[@revision] --dir <dir>    fetch from Hugging Face
+fornax freeze   <hf_repo>@<sha> --dir <dir>         write the store manifest in place
+fornax push     <hf_repo>@<sha> --dir <dir> --bucket <root>
+fornax verify   <prefix>                            check a store against its manifest
+fornax list     --bucket <root>                     what is mirrored there
+fornax serve    --manifest <manifest.yaml>          run a model
+fornax validate <models-dir | manifest.yaml>        check manifests and deploys
+fornax install  --manifest <manifest.yaml>          place the unit + manifest on a host
+fornax bench    --url <base> --model <id>           measure a live endpoint
+fornax version
 ```
 
 ## Documentation
@@ -112,11 +116,11 @@ llmops version
 
 ## Status
 
-Working today: the `llmops` command end to end — weight fetch, freeze
+Working today: the `fornax` command end to end — weight fetch, freeze
 and verify, the serving entrypoint and health shim, all three caller
 dialects, the bench harness, and `install` for a bare-metal host.
 Pinned manifests with the deploy artifact each one owns, and a
-consistency check between them that runs in CI and in `llmops validate`.
+consistency check between them that runs in CI and in `fornax validate`.
 The whole pipeline is exercised end to end on a laptop.
 
 Qwen3.8-27B serves on a GB10 host, at full BF16 with no quantization,
@@ -135,7 +139,7 @@ CLI flags may change while the first models are brought up.
 
 ## How Latere uses it
 
-llmops is built to be Latere's inference layer, in place of renting
+Fornax is built to be Latere's inference layer, in place of renting
 model access through a router: seven open-weight models pinned and
 frozen, six for bare-metal Kubernetes GPU nodes and one for a
 single-GPU GB10 host, each registered as a provider behind Lux, the

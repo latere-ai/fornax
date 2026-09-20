@@ -43,7 +43,7 @@ thinking-effort modes (High/Max).
 ## Acceptance criteria
 
 1. `zai-org/GLM-5.2-FP8` mirrored + verified in S3.
-2. Manifest validates against `deploy/glm-5.2/lws.yaml` (`llmops
+2. Manifest validates against `deploy/glm-5.2/lws.yaml` (`fornax
    validate`, also in CI) — **holds today**; and serves on 8x H200 via
    LWS from NVMe cache, which does not.
 3. e2e suite (`make e2e-glm-5.2`, the reserved `e2e-<model>` GPU

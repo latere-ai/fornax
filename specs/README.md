@@ -1,6 +1,6 @@
-# llmops specs
+# Fornax specs
 
-Design records for llmops: how open-weight models are frozen, served,
+Design records for Fornax: how open-weight models are frozen, served,
 deployed and measured, and why each choice was made that way.
 Start with [000-architecture](000-architecture.md) (umbrella), then read in
 number order — the numbering is the implementation order.
@@ -35,26 +35,27 @@ and only three:
 | 017 | [Model: DeepSeek-V4-Flash-0731](017-model-deepseek-v4-flash-0731.md) | draft | Answers 007 AC1; first speculative decoding (DSpark), 8x B200 |
 | 018 | [Model: Kimi-K3](018-model-kimi-k3.md) | draft | 2.8T multimodal; new B300 pool, K3-only image, MaaS license gate |
 | 019 | [GB10 serving target](019-gb10-serving-target.md) | partial | Single-GPU unified-memory lab box; memory budget, one model per host |
-| 020 | [Bare-metal deploy mode](020-bare-metal-packaging.md) | partial | Installed binary + systemd beside k8s; `llmops install` |
+| 020 | [Bare-metal deploy mode](020-bare-metal-packaging.md) | partial | Installed binary + systemd beside k8s; `fornax install` |
 | 021 | [Local weight loading](021-local-weight-loading.md) | complete | `load: local`, verify in place, no S3 required |
 | 022 | [Model: Qwen3.8-27B](022-model-qwen3.8-27b.md) | partial | First dense/multimodal model; BF16 on 1x GB10, measured 3.0 tok/s |
 | 023 | [Model: DeepSeek-V4-Flash-0731 (GB10)](023-model-deepseek-v4-flash-0731-gb10.md) | draft | Reduced-precision tier, separate endpoint; gated on a product call |
-| 024 | [One binary: the llmops command](024-single-cli.md) | complete | Three binaries collapse into ten flat `llmops` subcommands |
+| 024 | [One binary: the Fornax command](024-single-cli.md) | complete | Three binaries collapse into ten flat `fornax` subcommands |
 | 025 | [Dialect surfaces](025-dialect-surfaces.md) | complete | All three caller dialects; engine dialect declared, loss reported |
 | 026 | [Harness integration](026-harness-integration.md) | complete | `ps`, `endpoint --harness`, `run` — the last mile to coding against it |
 | 027 | [Qwen fast path](027-qwen-fast-path.md) | partial | NVFP4 + a chosen draft head; built and validating, nothing served yet |
-| 028 | [Fornax naming migration](028-fornax-rename.md) | draft | Repository, module, command, configuration, and sibling references |
+| 028 | [Fornax naming migration](028-fornax-rename.md) | partial | Repository, module, command, configuration, and sibling references |
 
 ### What is built, and what each built spec still owes
 
 | # | Open criterion |
 |---|---|
+| 028 | Source migration and local verification pass. Remote rename, publication, and installation verification remain. |
 | 019 | AC4 — **answered the hard way.** 0.80 plus a freshly written 23 GB checkpoint still in page cache left the host ~2.6 GB and took the box down (2026-08-29). No manifest sits at the ceiling now; whether the ceiling itself should drop is open until the kernel log is read. AC7 — the deploy guide does not describe the gb10 pool. |
 | 020 | AC6 — no end-to-end test covers install → serve → `/ready` → completion. AC7 was recorded met while `docs/deploy.md` described only the cluster path; the bare-metal half is now written, so AC7 holds. |
 | 022 | AC4 — **no 262K-token request has been sent.** The cache holds 292,125 tokens, but capacity is not a served request. |
 | 002 | AC4/AC5 — the mirror tool is built and tested, but the ~2.7 TB fleet set is not mirrored and no engine has loaded from an S3 prefix. |
 | 003 | AC1/AC4 — the health contract, both dialect surfaces and the warm-cache skip are built and tested; `s3-stream` has never run against a real engine. |
-| 010 | AC1/AC3/AC4 — `llmops bench` is built and has measured a live model; the dashboards, the numbers-into-specs flow and the router comparison do not exist. |
+| 010 | AC1/AC3/AC4 — `fornax bench` is built and has measured a live model; the dashboards, the numbers-into-specs flow and the router comparison do not exist. |
 | 027 | AC3/AC4/AC5/AC8 — the schema, the serving path and the operator surfaces are built, the manifest validates, and AC1 is closed (all three artifacts frozen and verified on the box). **Nothing has served yet**: the first attempt asked for 0.80 of the unified pool and took the host down, so no throughput or quality number exists. |
 
 Everything else those specs asked for holds. 001, 011, 021, 024, 025 and
@@ -120,7 +121,7 @@ vLLM can load a 304B MoE from GGUF.
 
 024, 025 and 026 are complete and came out of using what we already had.
 Shipping binaries to a host made three of them a cost the container mode
-never paid, so `mirror`, `runtime` and `bench` became one `llmops`
+never paid, so `mirror`, `runtime` and `bench` became one `fornax`
 command — sequenced before the first deploy, because changing an
 entrypoint is free until something runs on it. 025 found the shim wiring
 **two of llmdialect's eight codecs**, and discarding the loss report the

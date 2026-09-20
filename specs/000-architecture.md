@@ -1,5 +1,5 @@
 ---
-title: llmops Architecture (umbrella)
+title: fornax Architecture (umbrella)
 status: draft
 depends_on: []
 affects:
@@ -12,7 +12,7 @@ author: changkun
 dispatched_task_id: null
 ---
 
-# llmops Architecture (umbrella)
+# Fornax Architecture (umbrella)
 
 ## Overview
 
@@ -46,7 +46,7 @@ Three planes:
    installed binary under systemd on a single-GPU host
    ([[001-inference-engine-selection]], [[003-serving-runtime]],
    [[008-k8s-serving]], [[020-bare-metal-packaging]]). Both run the same
-   `llmops serve` and share the manifest schema, so a model's
+   `fornax serve` and share the manifest schema, so a model's
    description does not depend on how it is started.
 3. **Access plane** — two ways in, and neither is a gateway
    reimplementation. Endpoints register in Lux, the latere model
@@ -60,11 +60,11 @@ flowchart LR
   Frozen -->|push / verify| S3["S3 prefix"]
   Frozen --> Disk["host disk<br/>load: local"]
   Manifest["models/name.yaml"] --> Serve
-  S3 -->|LWS on k8s| Serve["llmops serve<br/>weights → engine → shim"]
+  S3 -->|LWS on k8s| Serve["fornax serve<br/>weights → engine → shim"]
   Disk -->|systemd unit| Serve
   Serve --> API["one port<br/>/v1/chat/completions<br/>/v1/messages<br/>/v1/responses"]
   API --> Lux["Lux gateway<br/>authn, usage, cost"]
-  API --> Harness["coding harness<br/>llmops endpoint / run"]
+  API --> Harness["coding harness<br/>fornax endpoint / run"]
 ```
 
 Every model serves all three caller dialects on one port. The engine's
@@ -75,7 +75,7 @@ translator package, so the gateway and the endpoint behind it never
 disagree about what a request means.
 
 One binary does all of it. `mirror`, `runtime` and `bench` collapsed
-into `llmops` with a flat set of subcommands ([[024-single-cli]]),
+into `fornax` with a flat set of subcommands ([[024-single-cli]]),
 because shipping three binaries to a host is a cost the container mode
 never paid. Thirteen of them today, after [[026-harness-integration]]
 added `ps`, `endpoint` and `run`.

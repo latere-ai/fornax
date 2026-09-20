@@ -56,7 +56,7 @@ func clientSpans(rec *tracetest.SpanRecorder) int {
 	return n
 }
 
-// TestDiscoverPropagatesTraceContext: `llmops ps` probes endpoints this fleet
+// TestDiscoverPropagatesTraceContext: `fornax ps` probes endpoints this fleet
 // serves, so the probe and what it finds belong in one trace.
 func TestDiscoverPropagatesTraceContext(t *testing.T) {
 	rec := installTracing(t)
@@ -73,7 +73,7 @@ func TestDiscoverPropagatesTraceContext(t *testing.T) {
 		case "/v1/models":
 			_, _ = fmt.Fprint(w, `{"data":[{"id":"qwen"}]}`)
 		case "/metrics":
-			_, _ = fmt.Fprintln(w, "llmops_weights_load_seconds 12.5")
+			_, _ = fmt.Fprintln(w, "fornax_weights_load_seconds 12.5")
 		default:
 			http.NotFound(w, r)
 		}

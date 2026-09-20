@@ -18,9 +18,9 @@ import (
 
 	"latere.ai/x/pkg/otel"
 
-	"github.com/latere-ai/llmops/internal/deploycheck"
-	"github.com/latere-ai/llmops/internal/manifest"
-	"github.com/latere-ai/llmops/internal/runtime"
+	"latere.ai/x/fornax/internal/deploycheck"
+	"latere.ai/x/fornax/internal/manifest"
+	"latere.ai/x/fornax/internal/runtime"
 )
 
 // runServing handles the two verbs that act on a manifest: starting the
@@ -34,7 +34,7 @@ func runServing(cmd string, rest []string, out, errw io.Writer) error {
 		deployDir := fs.String("deploy", "", "deploy directory (default: <models-dir>/../deploy)")
 		target, flags := popPositional(rest)
 		if err := fs.Parse(flags); err != nil || target == "" {
-			return usagef("usage: llmops validate <models-dir | manifest.yaml> [--deploy <dir>]")
+			return usagef("usage: fornax validate <models-dir | manifest.yaml> [--deploy <dir>]")
 		}
 		return validate(target, *deployDir, out)
 
@@ -48,7 +48,7 @@ func runServing(cmd string, rest []string, out, errw io.Writer) error {
 		speculator := fs.String("speculator", "",
 			`draft-model configuration to serve with; "none" disables speculation (default: the manifest's)`)
 		if err := fs.Parse(rest); err != nil || *path == "" {
-			return usagef("usage: llmops serve --manifest <manifest.yaml> [--speculator <name|none>]")
+			return usagef("usage: fornax serve --manifest <manifest.yaml> [--speculator <name|none>]")
 		}
 		m, err := manifest.Load(*path)
 		if err != nil {
@@ -63,7 +63,7 @@ func runServing(cmd string, rest []string, out, errw io.Writer) error {
 		}
 		opts.Version, opts.Commit = buildIdentity()
 		// Test/debug hook: replace the engine command.
-		if o := os.Getenv("LLMOPS_ENGINE_CMD"); o != "" {
+		if o := os.Getenv("FORNAX_ENGINE_CMD"); o != "" {
 			opts.EngineCmd = strings.Fields(o)
 		}
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -77,7 +77,7 @@ func runServing(cmd string, rest []string, out, errw io.Writer) error {
 		// is set, so a bare-metal host with no collector pays nothing but the
 		// local handler.
 		logger, shutdown, err := otel.Bootstrap(ctx, otel.Config{
-			ServiceName: "llmops",
+			ServiceName: "fornax",
 			Version:     otel.Version(version),
 			// The local handler writes to the command's error stream, which
 			// is os.Stderr in production and a buffer under test. Letting it

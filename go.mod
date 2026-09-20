@@ -1,4 +1,4 @@
-module github.com/latere-ai/llmops
+module latere.ai/x/fornax
 
 go 1.27.0
 

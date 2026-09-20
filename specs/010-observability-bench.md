@@ -5,7 +5,7 @@ depends_on:
   - 003-serving-runtime.md
 affects:
   - internal/bench/
-  - cmd/llmops/
+  - cmd/fornax/
   - deploy/
 effort: small
 created: 2026-07-18
@@ -29,8 +29,8 @@ producing the numbers the per-model specs and Lux cost entries require.
    via PodMonitor ([[008-k8s-serving]]); one Grafana dashboard per model
    from a shared template: tok/s, TTFT p50/p95, concurrent requests,
    KV-cache %, GPU utilization (DCGM), plus the shim's own
-   `llmops_weights_load_seconds`, `llmops_dialect_loss_total{dialect,field}`
-   ([[025-dialect-surfaces]]) and `llmops_speculator_info`
+   `fornax_weights_load_seconds`, `fornax_dialect_loss_total{dialect,field}`
+   ([[025-dialect-surfaces]]) and `fornax_speculator_info`
    ([[027-qwen-fast-path]]).
 
    **Device-memory metrics are absent on the GB10 class**
@@ -40,7 +40,7 @@ producing the numbers the per-model specs and Lux cost entries require.
    substitute signal, and the engine's own KV-cache gauges are the
    substitute for cache occupancy. A dashboard for a gb10 model must not
    present an empty DCGM panel as a healthy zero.
-2. **Bench harness** (`internal/bench`, `llmops bench`): drives
+2. **Bench harness** (`internal/bench`, `fornax bench`): drives
    OpenAI-compatible endpoints with configurable concurrency and output
    length; outputs a JSON report.
 
@@ -66,7 +66,7 @@ producing the numbers the per-model specs and Lux cost entries require.
 
 1. Dashboard template renders for any model manifest; live for the first
    deployed model.
-2. `llmops bench --url <base> --model <id>` produces a stable JSON
+2. `fornax bench --url <base> --model <id>` produces a stable JSON
    report; two consecutive runs within documented variance (test).
    **Built, and it has measured a live model**
    ([[022-model-qwen3.8-27b]]); the documented-variance half is not

@@ -8,7 +8,7 @@ affects:
   - internal/manifest/
   - internal/runtime/prep.go
   - internal/mirror/
-  - cmd/llmops/
+  - cmd/fornax/
   - docs/deploy.md
 effort: small
 created: 2026-08-28
@@ -80,7 +80,7 @@ are properties of the model; the root is a property of the machine.
 
 Putting an absolute path in the manifest was the obvious first design
 and is wrong: `models/*.yaml` is checked into a public repo, so a path
-like `/home/<user>/dev/llmops/weights/...` would commit one machine's
+like `/home/<user>/dev/fornax/weights/...` would commit one machine's
 directory layout — and one person's username — into the shared source of
 truth, and would need editing on every host. Splitting it this way keeps
 one manifest describing the model everywhere, while the operator still
@@ -118,19 +118,19 @@ serving process must not verify a directory that a `mirror` run is
 writing, whether the two are pods on a node or a systemd unit and an
 operator's shell.
 
-### `llmops freeze`
+### `fornax freeze`
 
-`llmops pull` fetches a repo to a directory and `llmops push` writes
+`fornax pull` fetches a repo to a directory and `fornax push` writes
 `_manifest.json` **into the store** as the last step. There is no way to
 get that provenance artifact into a directory that will be served
 directly. Add:
 
 ```sh
-llmops freeze <repo>@<sha> --dir <weights-root>/<repo>/<sha>/
+fornax freeze <repo>@<sha> --dir <weights-root>/<repo>/<sha>/
 ```
 
 It runs the same tree/verify path as `push` and writes `_manifest.json`
-in place. `llmops verify` already accepts any store prefix, so it works
+in place. `fornax verify` already accepts any store prefix, so it works
 on a local directory with no change.
 
 ## Diagram
@@ -138,9 +138,9 @@ on a local directory with no change.
 ```mermaid
 flowchart TB
   HF["Hugging Face<br/>repo@revision"]
-  HF -->|"llmops pull"| DIR["local directory"]
-  DIR -->|"llmops push"| S3["s3://bucket/repo/rev/"]
-  DIR -->|"llmops freeze"| LOC["local store<br/>+ _manifest.json"]
+  HF -->|"fornax pull"| DIR["local directory"]
+  DIR -->|"fornax push"| S3["s3://bucket/repo/rev/"]
+  DIR -->|"fornax freeze"| LOC["local store<br/>+ _manifest.json"]
 
   S3 -->|"load: nvme-cache<br/>fetch + verify → cache"| E1["engine"]
   S3 -->|"load: s3-stream<br/>vllm only, no staging"| E2["engine"]
@@ -169,7 +169,7 @@ deferral rather than the intended shape.
   modes — an existing manifest with it removed still fails.
 - **AC4** `PrepareWeights` under `load: local` returns the resolved
   directory, performs no writes inside it beyond the lock file **at
-  serve time**, and a test asserts no file is copied. `llmops pull`,
+  serve time**, and a test asserts no file is copied. `fornax pull`,
   `push` and `freeze` ([[024-single-cli]] collapsed the `mirror` tool
   into them) are the only writers of a local store, and they run before
   the endpoint starts, never during it.
@@ -183,7 +183,7 @@ deferral rather than the intended shape.
   expand tilde in `ExecStart`.
 - **AC5** A corrupt file in a local store fails the launch with a hash
   mismatch and does **not** attempt a fetch.
-- **AC6** `llmops freeze` writes a `_manifest.json` that `llmops verify`
+- **AC6** `fornax freeze` writes a `_manifest.json` that `fornax verify`
   accepts, and that `PrepareWeights` then verifies clean.
 - **AC7** `make e2e` covers pull → freeze → serve on a local directory
   with no S3 and no MinIO in the path.

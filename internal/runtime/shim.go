@@ -31,7 +31,7 @@ import (
 	"latere.ai/x/pkg/llmdialect/openairesp"
 	"latere.ai/x/pkg/otel"
 
-	"github.com/latere-ai/llmops/internal/manifest"
+	"latere.ai/x/fornax/internal/manifest"
 )
 
 // Shim fronts the engine with the latere service contract
@@ -40,7 +40,7 @@ import (
 //	GET /livez    — 200 once the process is up
 //	GET /readyz   — 200 when weights are loaded AND the engine is healthy
 //	GET /version  — the build identity
-//	GET /metrics  — engine Prometheus output + llmops_* gauges
+//	GET /metrics  — engine Prometheus output + fornax_* gauges
 //	anything else — reverse-proxied to the engine (token streaming safe)
 //
 // The four probe paths are pkg/health's; /healthz and /ready are aliases
@@ -94,14 +94,14 @@ type Shim struct {
 
 // meterName scopes the shim's instruments. It is the import path of the
 // package that owns them, which is what an instrumentation scope is for.
-const meterName = "github.com/latere-ai/llmops/internal/runtime"
+const meterName = "latere.ai/x/fornax/internal/runtime"
 
 // registerMetrics publishes the shim's own facts as OTel instruments and
 // returns the callback's unregister function.
 //
 // The Prometheus text endpoint stays. It is not a scrape target: nothing
-// in the fleet runs Prometheus, but `llmops ps` reads
-// llmops_weights_load_seconds out of it on every invocation
+// in the fleet runs Prometheus, but `fornax ps` reads
+// fornax_weights_load_seconds out of it on every invocation
 // (internal/harness/discover.go), so it is a first-party API of this CLI.
 // Removing it would break `ps` and the local e2e script to save a
 // handler nobody was paying for. These instruments are how the same
@@ -118,7 +118,7 @@ const meterName = "github.com/latere-ai/llmops/internal/runtime"
 func (s *Shim) registerMetrics() (func() error, error) {
 	m := otelapi.GetMeterProvider().Meter(meterName)
 
-	weights, err := m.Float64ObservableGauge("llmops.weights.load.duration",
+	weights, err := m.Float64ObservableGauge("fornax.weights.load.duration",
 		metric.WithUnit("s"),
 		metric.WithDescription("Time spent preparing weights before engine start."))
 	if err != nil {
@@ -127,12 +127,12 @@ func (s *Shim) registerMetrics() (func() error, error) {
 	// A label-only gauge, so a throughput figure can be broken down by the
 	// draft head that produced it (specs/027): the same endpoint answers
 	// at very different rates depending on which one is active.
-	spec, err := m.Int64ObservableGauge("llmops.speculator.info",
+	spec, err := m.Int64ObservableGauge("fornax.speculator.info",
 		metric.WithDescription("The draft-model configuration the engine is serving with."))
 	if err != nil {
 		return nil, err
 	}
-	loss, err := m.Int64Counter("llmops.dialect.loss",
+	loss, err := m.Int64Counter("fornax.dialect.loss",
 		metric.WithDescription("Request fields a caller's dialect could not carry."))
 	if err != nil {
 		return nil, err
@@ -157,7 +157,7 @@ func (s *Shim) registerMetrics() (func() error, error) {
 // manifest.SpeculatorNone. It follows LossHeader (specs/025): an
 // engine-side fact the caller cannot otherwise see, reported without
 // changing the payload.
-const SpeculatorHeader = "X-LLMOps-Speculator"
+const SpeculatorHeader = "X-Fornax-Speculator"
 
 // NewShim fronts the engine at engineURL (e.g. http://127.0.0.1:30000).
 func NewShim(engineURL string) (*Shim, error) {
@@ -280,7 +280,7 @@ func (s *Shim) EngineHealthy(ctx context.Context) bool {
 // probePaths are the paths the shim answers itself for the kubelet, the
 // scraper, and the release smoke: the four of pkg/health, plus /healthz
 // and /ready, aliases of /livez and /readyz for one release while the
-// manifests and `llmops ps` move (docs/health.md in pkg).
+// manifests and `fornax ps` move (docs/health.md in pkg).
 var probePaths = map[string]bool{
 	"/livez": true, "/readyz": true, "/version": true, "/metrics": true,
 	"/healthz": true, "/ready": true,
@@ -330,7 +330,7 @@ func (s *Shim) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Set before dispatch so it reaches proxied responses too: the
 	// reverse proxy copies the engine's headers in rather than
 	// replacing what is already there. /v1/models therefore carries it
-	// as well, which is what `llmops ps` reads.
+	// as well, which is what `fornax ps` reads.
 	if s.Speculator != "" {
 		w.Header().Set(SpeculatorHeader, s.Speculator)
 	}
@@ -481,7 +481,7 @@ func injectSystemPrompt(body []byte, sp *manifest.SystemPrompt) ([]byte, error) 
 // engine's OpenAI Chat endpoint, streaming included.
 // LossHeader names the request fields a surface could not carry. It
 // mirrors Lux's X-Lux-Compat-Loss so a client parsing one parses both.
-const LossHeader = "X-LLMOps-Compat-Loss"
+const LossHeader = "X-Fornax-Compat-Loss"
 
 // translated serves a caller dialect the engine does not speak, through
 // the shared IR (specs/025).
@@ -583,16 +583,16 @@ func (s *Shim) metrics(ctx context.Context, w http.ResponseWriter) {
 			_ = resp.Body.Close()
 		}
 	}
-	_, _ = fmt.Fprintf(w, "# HELP llmops_weights_load_seconds Time spent preparing weights before engine start.\n")
-	_, _ = fmt.Fprintf(w, "# TYPE llmops_weights_load_seconds gauge\n")
-	_, _ = fmt.Fprintf(w, "llmops_weights_load_seconds %g\n", s.weightsSecs.Load().(float64)) //nolint:errcheck // newShim stores a float64 before returning
+	_, _ = fmt.Fprintf(w, "# HELP fornax_weights_load_seconds Time spent preparing weights before engine start.\n")
+	_, _ = fmt.Fprintf(w, "# TYPE fornax_weights_load_seconds gauge\n")
+	_, _ = fmt.Fprintf(w, "fornax_weights_load_seconds %g\n", s.weightsSecs.Load().(float64)) //nolint:errcheck // newShim stores a float64 before returning
 
 	// A label-only gauge, so a throughput panel can be broken down by
 	// the speculator that produced it (specs/010, specs/027).
 	if s.Speculator != "" {
-		_, _ = fmt.Fprintf(w, "# HELP llmops_speculator_info The draft-model configuration the engine is serving with.\n")
-		_, _ = fmt.Fprintf(w, "# TYPE llmops_speculator_info gauge\n")
-		_, _ = fmt.Fprintf(w, "llmops_speculator_info{speculator=%q} 1\n", s.Speculator)
+		_, _ = fmt.Fprintf(w, "# HELP fornax_speculator_info The draft-model configuration the engine is serving with.\n")
+		_, _ = fmt.Fprintf(w, "# TYPE fornax_speculator_info gauge\n")
+		_, _ = fmt.Fprintf(w, "fornax_speculator_info{speculator=%q} 1\n", s.Speculator)
 	}
 
 	// One line per (surface, field) a caller asked for and the dialect
@@ -600,14 +600,14 @@ func (s *Shim) metrics(ctx context.Context, w http.ResponseWriter) {
 	var lines []string
 	s.lossCount.Range(func(k, v any) bool {
 		key := k.(lossKey) //nolint:errcheck // recordLoss is the only writer, and it keys on lossKey
-		lines = append(lines, fmt.Sprintf("llmops_dialect_loss_total{dialect=%q,field=%q} %d",
+		lines = append(lines, fmt.Sprintf("fornax_dialect_loss_total{dialect=%q,field=%q} %d",
 			string(key.dialect), key.field, v.(*atomic.Int64).Load())) //nolint:errcheck // recordLoss stores *atomic.Int64 only
 		return true
 	})
 	if len(lines) > 0 {
 		sort.Strings(lines) // stable output; Range order is undefined
-		_, _ = fmt.Fprintf(w, "# HELP llmops_dialect_loss_total Request fields a caller's dialect could not carry.\n")
-		_, _ = fmt.Fprintf(w, "# TYPE llmops_dialect_loss_total counter\n")
+		_, _ = fmt.Fprintf(w, "# HELP fornax_dialect_loss_total Request fields a caller's dialect could not carry.\n")
+		_, _ = fmt.Fprintf(w, "# TYPE fornax_dialect_loss_total counter\n")
 		for _, l := range lines {
 			_, _ = fmt.Fprintln(w, l)
 		}

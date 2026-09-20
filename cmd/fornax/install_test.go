@@ -48,7 +48,7 @@ func TestInstallWritesAndIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(unit), "llmops serve --manifest") {
+	if !strings.Contains(string(unit), "fornax serve --manifest") {
 		t.Fatalf("unit does not start the service:\n%s", unit)
 	}
 	if _, err := os.Stat(filepath.Join(root, "etc", "qwen.yaml")); err != nil {

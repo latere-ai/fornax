@@ -20,8 +20,8 @@ import (
 
 	"latere.ai/x/pkg/otel"
 
-	"github.com/latere-ai/llmops/internal/manifest"
-	"github.com/latere-ai/llmops/internal/mirror"
+	"latere.ai/x/fornax/internal/manifest"
+	"latere.ai/x/fornax/internal/mirror"
 )
 
 // Options configure Serve. Zero values get production defaults.
@@ -101,7 +101,7 @@ func EngineCommand(m *manifest.Manifest, model string, port int, spec manifest.S
 		return nil, fmt.Errorf("runtime %q has no engine command (custom images launch themselves)", m.Runtime)
 	}
 	// Serve under the manifest name, not the weights path — callers
-	// address models as llmops/<name> and both engines 404 unknown
+	// address models as fornax/<name> and both engines 404 unknown
 	// model ids otherwise.
 	cmd = append(cmd, "--served-model-name", m.Name)
 	cmd = append(cmd, m.Args...)
@@ -129,7 +129,7 @@ func renderOverride(tmpl []string, model string, port int) []string {
 
 // probeRequest reports whether a request is machinery rather than a
 // caller. The kubelet polls /livez and /readyz on every pod on a
-// seconds-long period (deploy/*/lws.yaml), and `llmops ps` scrapes
+// seconds-long period (deploy/*/lws.yaml), and `fornax ps` scrapes
 // /metrics on every invocation. A span each would outnumber the
 // inference spans the trace exists to show.
 func probeRequest(r *http.Request) bool {
@@ -155,7 +155,7 @@ func Serve(ctx context.Context, m *manifest.Manifest, opts Options) error {
 	}
 	shim.Speculator = spec.Name
 	shim.SystemPrompt = m.SystemPrompt
-	shim.HealthPath = os.Getenv("LLMOPS_ENGINE_HEALTH_PATH")
+	shim.HealthPath = os.Getenv("FORNAX_ENGINE_HEALTH_PATH")
 	shim.Version, shim.Commit = opts.Version, opts.Commit
 
 	// After the shim's fields are set and before it serves: the metric
@@ -174,7 +174,7 @@ func Serve(ctx context.Context, m *manifest.Manifest, opts Options) error {
 	// The shim is wrapped once, here, rather than inside NewShim: a
 	// handler wrapped twice reports two server spans per request, and
 	// this is the only place a listener is attached to it.
-	srv := &http.Server{Handler: otel.Handler(shim, "llmops",
+	srv := &http.Server{Handler: otel.Handler(shim, "fornax",
 		otel.WithSkip(probeRequest),
 		otel.WithRouteTemplate(shim.RouteTemplate),
 	)}

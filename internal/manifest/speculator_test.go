@@ -95,7 +95,7 @@ func TestSpeculatorRulesApplyToTheCombination(t *testing.T) {
 }
 
 // TestManifestNeverWritesTheDraftPath: the path depends on the host's
-// cache root, so llmops derives it. A manifest stating one would pin
+// cache root, so fornax derives it. A manifest stating one would pin
 // the file to a single machine, the same reason primary weights name no
 // directory (specs/021).
 func TestManifestNeverWritesTheDraftPath(t *testing.T) {

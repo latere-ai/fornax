@@ -16,11 +16,11 @@ dispatched_task_id: null
 
 ## Overview
 
-llmops endpoints become first-class providers in Lux, the latere
+Fornax endpoints become first-class providers in Lux, the latere
 model gateway. Lux owns authn (virtual keys), usage/cost tracking,
-limits, and audit; llmops exposes the model endpoint. The goal state: a
+limits, and audit; Fornax exposes the model endpoint. The goal state: a
 latere app switches from `openrouter/deepseek/...` to
-`llmops/deepseek-v4-pro` by changing a model string in Lux — nothing
+`fornax/deepseek-v4-pro` by changing a model string in Lux — nothing
 else.
 
 Two things narrow this spec's boundary since it was written.
@@ -31,7 +31,7 @@ straight at a host with no gateway in the path
 and works on; Lux is for anything with more than one caller, and it
 remains the only ingress for a fleet endpoint.
 
-**Dialect translation happens on both sides of it.** An llmops endpoint
+**Dialect translation happens on both sides of it.** An Fornax endpoint
 serves all three caller dialects itself ([[025-dialect-surfaces]]), and
 Lux embeds the same `llmdialect` package, so the gateway and the endpoint
 behind it cannot disagree about what a request means. What Lux must
@@ -42,7 +42,7 @@ gateway.
 
 1. **Provider registration**: each served model registered in Lux as a
    provider/route pointing at its base URL — in-cluster service DNS
-   (`http://<model>.llmops.svc:8000/v1`) for a `deploy: k8s` model, and
+   (`http://<model>.fornax.svc:8000/v1`) for a `deploy: k8s` model, and
    `http://<host>:<port>/v1` for a `deploy: bare-metal` one, which has no
    service DNS at all ([[020-bare-metal-packaging]]). Mechanism follows
    Lux's existing provider config (investigate at impl time whether
@@ -50,7 +50,7 @@ gateway.
 2. **Cost model**: per-model amortized $/token entered into Lux's cost
    tracking so router-vs-self-host economics stay visible (inputs: node
    cost, measured tok/s from 010 benchmarks).
-3. **Naming**: model ids stable and versioned: `llmops/<name>` with
+3. **Naming**: model ids stable and versioned: `fornax/<name>` with
    the manifest revision surfaced in Lux metadata.
 
 ## Acceptance criteria

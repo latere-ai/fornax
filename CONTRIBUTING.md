@@ -6,14 +6,14 @@ and every change is one small commit with a message that says why.
 
 ## Writing
 
-Every sentence llmops emits or carries is written for one reader, and the
+Every sentence Fornax emits or carries is written for one reader, and the
 register follows the reader:
 
 - User, a person or a coding harness: CLI output, the OpenAI-compatible
   endpoint error `message`, the docs. Short and plain: what happened and
   what to do next, naming a command or a page, never a package, a function,
   a table, or a Kubernetes object.
-- Contributor, someone changing llmops: specs, this file, package
+- Contributor, someone changing Fornax: specs, this file, package
   documentation, commit messages, source comments. Precise, in the project's
   own terms, with the reason a design is what it is.
 - Developer, someone debugging a running system: logs, traces, serving and
