@@ -90,7 +90,7 @@ manifest already carries the engine.
 that speaks something else declares it, and the shim builds each
 translator against that backend rather than a compiled-in one.
 
-This is not hypothetical. `latere.ai/tgo` serves OpenAI Chat, Anthropic
+This is not hypothetical. `latere.ai/x/forma` serves OpenAI Chat, Anthropic
 Messages, and OpenAI Responses natively; pointing our shim at it while
 assuming OpenAI Chat would translate Anthropic → OpenAI Chat only for
 the engine to translate back, losing on both hops for no reason.
