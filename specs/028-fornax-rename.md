@@ -1,6 +1,6 @@
 ---
 title: "Rename the model deployment and serving component to Fornax"
-status: partial
+status: complete
 depends_on:
   - 024-single-cli.md
 affects:
@@ -65,4 +65,13 @@ coverage; all eight model manifests and their deployment artifacts validate.
 The build, format, spec, dependency, cgo-free, and Linux amd64/arm64 distribution
 checks pass. `docs/migration.md` describes how to update existing installations.
 
-Remote repository publication and installation verification remain open.
+GitHub is renamed to `latere-ai/fornax`, and the local checkout is `fornax/`.
+The generic vanity handler resolves `latere.ai/x/fornax`. Installing
+`latere.ai/x/fornax/cmd/fornax@main` from the published repository succeeds, and
+the installed command validates all eight manifests and deployment artifacts.
+The push-time linter reports no issues. References are published in `.github`,
+ci-gate, ci, specs, and Forma. Unrelated working changes, historical checkpoint
+paths, and external LLMOps citations are preserved.
+
+All acceptance criteria are complete. No live deployment, cache migration,
+container publication, or release tag was part of this change.
