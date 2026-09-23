@@ -110,7 +110,7 @@ load: local  →  verify <weights-root>/<hf_repo>/<revision> in place
 A hash mismatch **fails the launch**. It does not re-fetch, because
 unlike `nvme-cache` there is no upstream to fall back to — a corrupt
 local store is an operator problem, and silently repairing it would
-defeat the freeze. This is the one behavioural difference between the
+defeat the freeze. This is the one behavioral difference between the
 modes, and it is deliberate.
 
 The `flock` on the directory still applies, in either deploy mode: a

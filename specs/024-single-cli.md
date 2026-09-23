@@ -156,7 +156,7 @@ answered it.
   name and default it has today.
 - **AC2** The tests that covered the three binaries pass unchanged in
   their new location, save for the program name and the dropped `mirror`
-  word in usage assertions. A test that needed rewriting means behaviour
+  word in usage assertions. A test that needed rewriting means behavior
   moved, which this spec does not permit.
 - **AC3** `fornax` with no arguments, and with an unknown subcommand,
   exits non-zero and lists the available subcommands.
@@ -181,7 +181,7 @@ answered it.
 
 - Renaming or restructuring flags. A rename plus a flag change is two
   migrations wearing one commit.
-- Behaviour changes to any subcommand.
+- Behavior changes to any subcommand.
 - A configuration file, shell completion, or an interactive mode.
 - Splitting command bodies into `internal/cli`. They are small and
   already tested where they sit; moving them is churn without a reason.

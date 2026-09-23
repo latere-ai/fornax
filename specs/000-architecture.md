@@ -98,7 +98,7 @@ added `ps`, `endpoint` and `run`.
 - The single-GPU class is a different shape, not a smaller one: one GPU,
   one memory pool shared with the CPU, and no cluster around it
   ([[019-gb10-serving-target]]). Its first constraint is memory
-  *behaviour* — an engine's memory fraction is taken from the host's RAM
+  *behavior* — an engine's memory fraction is taken from the host's RAM
   too. Its second is throughput, and that one is now measured rather
   than predicted: undamaged BF16 weights serve at **3.0 tok/s**, and the
   same model with 4-bit weights and a draft head has been measured at

@@ -76,7 +76,7 @@ closed unimplemented rather than left open.
   experts, FP8 attention/dense, 166.9 GB, 1M context.
 - **The checkpoint is quantization-aware trained with routed experts
   stored natively in MXFP4** — roughly 4 bits. This is commonly read as
-  licence to go lower. It is not: QAT makes the model robust *at its
+  license to go lower. It is not: QAT makes the model robust *at its
   native 4 bits*. Every step below is ordinary quantization loss. This
   cuts against the smallest quants, not for them.
 - The vendor checkpoint at 166.9 GB does not fit 128 GB, and neither
@@ -116,7 +116,7 @@ activations out of the same 102 GB:
 Two things follow, and both are uncomfortable:
 
 - **The 3-bit quants are out entirely**, so the QAT argument against
-  going below native 4-bit cannot be honoured at all on this node.
+  going below native 4-bit cannot be honored at all on this node.
 - **The draft head is unaffordable.** Adding 10.9 GB leaves no usable
   KV at any weight size worth serving, so speculative decoding is off
   the table on this node unless the ceiling moves.

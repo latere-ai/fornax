@@ -100,7 +100,7 @@ the engine to translate back, losing on both hops for no reason.
 When a caller's dialect equals the engine's, there is nothing to
 translate: the request is proxied, with system-prompt injection applied
 if the manifest asks for it. That is what `/v1/chat/completions` does
-today, and it generalises — it should fall out of the table, not be a
+today, and it generalizes — it should fall out of the table, not be a
 separate branch.
 
 ## The loss report is collected and then dropped

@@ -103,7 +103,7 @@ frozen-weights provenance and the health contract, and `deploycheck`
 covers both.
 
 019 states what the hardware class costs, and the cost is memory
-behaviour rather than software availability: a memory *fraction* is taken
+behavior rather than software availability: a memory *fraction* is taken
 from the host's RAM too, the engine fills whatever it is given, device
 memory is unreadable through `nvidia-smi`, and CPU offload buys nothing
 because there is no second pool. 021 drops the S3 requirement so a host

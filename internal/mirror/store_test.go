@@ -39,7 +39,7 @@ func TestLocalStorePutLeavesNothingBehindWhenTheCopyFails(t *testing.T) {
 
 // TestLocalStoreGetFailsRatherThanWritingAShortFile covers Get's copy-failure
 // path. Get returning nil for a truncated file is the bug the Close check was
-// added for; this pins the neighbouring branch that the same fix reshaped.
+// added for; this pins the neighboring branch that the same fix reshaped.
 func TestLocalStoreGetFailsRatherThanWritingAShortFile(t *testing.T) {
 	root := t.TempDir()
 	s := &LocalStore{Root: root}

@@ -16,7 +16,7 @@ import (
 //
 // A plain `go build` targets the builder, so building on a laptop for
 // an arm64 host emits an amd64 binary that installs fine and dies with
-// "exec format error" on first start. This asserts GOARCH is honoured
+// "exec format error" on first start. This asserts GOARCH is honored
 // and that the result is a static ELF, since CGO would otherwise pull
 // in a dynamic loader the target host may not match.
 func TestCrossCompileTargetsRequestedArch(t *testing.T) {

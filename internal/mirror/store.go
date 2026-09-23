@@ -157,7 +157,7 @@ func (e *s5cmdExitError) Unwrap() error { return e.cause }
 func (s *S5cmdStore) run(args ...string) ([]byte, error) {
 	// The Store interface carries no context, so there is none to inherit
 	// here. s5cmd exits on its own; nothing in the process waits on a
-	// deadline this could honour.
+	// deadline this could honor.
 	out, err := exec.CommandContext(context.Background(), "s5cmd", args...).Output()
 	if err != nil {
 		var ee *exec.ExitError

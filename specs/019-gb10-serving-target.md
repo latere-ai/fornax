@@ -257,7 +257,7 @@ flowchart LR
   a real workload. **Answered, and it does not hold**: at 0.80 with a
   freshly written 23 GB checkpoint still in page cache, the host was
   left ~2.6 GB and stopped responding (2026-08-29, above). The
-  fraction's behaviour was already settled: measured 2026-08-28, vLLM at
+  fraction's behavior was already settled: measured 2026-08-28, vLLM at
   `--gpu-memory-utilization 0.30` held 37,651 MiB on this class,
   confirming the fraction applies to the full 128 GB unified pool and
   that the engine fills it.
