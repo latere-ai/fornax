@@ -5,9 +5,9 @@
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 Run open-weight models on GPUs you control, end to end. One Go binary
-freezes the weights, starts the inference engine, serves OpenAI- and
-Anthropic-compatible endpoints behind a health contract, and measures
-what came up.
+freezes the weights, starts the inference engine, serves OpenAI Chat,
+Anthropic Messages, and OpenAI Responses endpoints behind a health
+contract, and measures what came up.
 
 Two deploy modes share one manifest schema and one serving contract:
 Kubernetes for a multi-GPU fleet, and an installed binary under systemd
@@ -17,7 +17,7 @@ for a single-GPU host with no cluster around it.
 flowchart LR
   HF["Hugging Face<br/>repo@revision"] -->|fornax pull| Store["frozen store<br/>per-file checksums"]
   Store -->|fornax push / verify| S3["S3 prefix<br/>or local disk"]
-  S3 --> Serve["fornax serve<br/>weights → engine → shim"]
+  S3 --> Serve["fornax serve<br/>weights, engine, shim"]
   Manifest["models/name.yaml"] --> Serve
   Manifest -->|fornax install| Unit["systemd unit"]
   Manifest --> LWS["k8s LeaderWorkerSet"]
@@ -29,46 +29,80 @@ flowchart LR
 
 ## Why run it yourself
 
-- **Weight freeze.** Upstream Hugging Face repos mutate and disappear.
-  Every model is pinned to a revision and checksummed per file, then
-  never re-downloaded from upstream — into an S3 prefix for a fleet, or
-  in place on a host's own disk. `/readyz` does not flip until the
-  weights on disk match the manifest.
-- **Cost and control.** Serving on your own GPUs beats per-token router
-  pricing at sustained load, and removes third-party rate limits,
-  silent model swaps, and data egress to a router.
+- **Weight freeze.** Upstream Hugging Face repositories change and
+  disappear. Every model is pinned to a revision and checksummed per
+  file, then never downloaded from upstream again: into an S3 prefix for
+  a fleet, or in place on a host's own disk. `/readyz` does not report
+  ready until the weights on disk match the manifest.
+- **Cost and control.** At sustained load, your own GPUs cost less than
+  per-token router pricing, and they remove third-party rate limits,
+  silent model swaps, and data leaving your network.
 - **One surface, whatever the caller speaks.** An Anthropic SDK, an
-  OpenAI Chat client and an OpenAI Responses client all hit the same
-  endpoint. What a translation cannot carry is reported, not dropped
-  silently.
-- **A path to post-training.** Weights you control are the prerequisite
-  for fine-tuning or RL later.
+  OpenAI Chat client, and an OpenAI Responses client all reach the same
+  endpoint. What a translation between them cannot carry is reported in
+  a response header, not dropped silently.
+- **A path to post-training.** Weights you hold are the prerequisite for
+  fine-tuning or reinforcement learning later.
+
+## Status
+
+Fornax is early. There are no tagged releases and no published images
+yet, and the manifest schema, the endpoints, and the command flags may
+still change.
+
+- **Works and has served:** the whole command. Weight fetch, freeze, and
+  verify; the serving entrypoint with all three caller dialects;
+  `fornax bench`; and the bare-metal mode through `fornax install`.
+  Qwen3.8-27B serves this way on one GB10 host at full BF16, answering on
+  all three dialects including vision, at a measured 3.0 tokens per
+  second.
+- **Built and checked in CI, not yet served on real hardware:** the
+  Kubernetes path. Every checked-in model has a manifest and a
+  LeaderWorkerSet that `fornax validate` checks against each other, but
+  no model has served on a GPU node yet and the large weight sets are not
+  mirrored. The 4-bit Qwen fast path validates and has not served.
+
+## Install
+
+Go 1.27 or newer, no cgo:
+
+```sh
+go install latere.ai/x/fornax/cmd/fornax@main
+```
+
+`fornax` is one static binary. Some commands call tools you install
+beside it:
+
+| Command | Needs on `PATH` |
+|---|---|
+| `pull`, `push` | [`hf`](https://huggingface.co/docs/huggingface_hub/guides/cli), the Hugging Face command line |
+| `push`, `verify`, `list` against `s3://` | [`s5cmd`](https://github.com/peak/s5cmd) |
+| `serve` | the engine the manifest names: `vllm`, or `python3` with `sglang` installed |
+| `run` | the coding agent you launch: `claude`, `codex`, or `opencode` |
+
+The container images bundle all of this; see the
+[deploy guide](docs/deploy.md).
 
 ## Quick start
 
-Install the command with `go install latere.ai/x/fornax/cmd/fornax@main`.
-
-Go 1.27 or newer, no cgo, no other build dependency:
+From a checkout, so the manifests under `models/` are at hand. Freeze a
+model onto a host's own disk, then serve it:
 
 ```sh
 git clone https://github.com/latere-ai/fornax.git
 cd fornax
-make build                       # compile everything
-go install ./cmd/fornax          # puts fornax on your $PATH
-```
+go install ./cmd/fornax
 
-Freeze a model onto a host's own disk, then serve it:
-
-```sh
 fornax pull   Qwen/Qwen3.8-27B@<sha> --dir ~/.models/Qwen/Qwen3.8-27B/<sha>
 fornax freeze Qwen/Qwen3.8-27B@<sha> --dir ~/.models/Qwen/Qwen3.8-27B/<sha>
 fornax validate models/
 fornax serve --manifest models/qwen3.8-27b.yaml --cache-root ~/.models
 ```
 
-For a fleet, the weights go to any s5cmd-reachable bucket — AWS S3, DO
-Spaces, R2 and MinIO all work — and the same `serve` runs as the
-container entrypoint:
+`<sha>` is the 40-character revision the manifest pins. For a fleet, the
+weights go to any bucket `s5cmd` can reach (AWS S3, DigitalOcean Spaces,
+Cloudflare R2, MinIO), and the same `serve` runs as the container
+entrypoint:
 
 ```sh
 fornax push moonshotai/Kimi-K2.7-Code@<sha> \
@@ -76,7 +110,8 @@ fornax push moonshotai/Kimi-K2.7-Code@<sha> \
 fornax verify s3://<your-bucket>/moonshotai/Kimi-K2.7-Code/<sha>/
 ```
 
-Ask the endpoint anything an OpenAI or Anthropic client can ask:
+Ask the endpoint anything an OpenAI or Anthropic client can ask, and
+measure it:
 
 ```sh
 curl -s localhost:8000/v1/messages -H 'Content-Type: application/json' \
@@ -87,69 +122,63 @@ fornax bench --url http://localhost:8000 --model qwen3.8-27b \
     --concurrency 8 --requests 32 --out report.json
 ```
 
+The endpoint has no authentication. Keep it on a private network, or put
+a gateway in front of it; see [Security](docs/deploy.md#security).
+
 ## Commands
 
 ```
-fornax pull     <hf_repo>[@revision] --dir <dir>    fetch from Hugging Face
-fornax freeze   <hf_repo>@<sha> --dir <dir>         write the store manifest in place
-fornax push     <hf_repo>@<sha> --dir <dir> --bucket <root>
-fornax verify   <prefix>                            check a store against its manifest
-fornax list     --bucket <root>                     what is mirrored there
-fornax serve    --manifest <manifest.yaml>          run a model
-fornax validate <models-dir | manifest.yaml>        check manifests and deploys
-fornax install  --manifest <manifest.yaml>          place the unit + manifest on a host
-fornax bench    --url <base> --model <id>           measure a live endpoint
-fornax version
+weights
+  fornax pull     <hf_repo>[@revision] --dir <dir>    fetch from Hugging Face and verify
+  fornax freeze   <hf_repo>@<sha> --dir <dir>         write the store manifest in place
+  fornax push     <hf_repo>@<sha> --dir <dir> --bucket <root>
+  fornax verify   <prefix>                            check a store against its manifest
+  fornax list     --bucket <root>                     what is mirrored there
+
+serving
+  fornax serve    --manifest <manifest.yaml>          run a model
+  fornax validate <models-dir | manifest.yaml>        check manifests and deploy artifacts
+  fornax install  --manifest <manifest.yaml>          place the unit and manifest on this host
+  fornax ps                                           what is serving on this host
+  fornax endpoint --harness <name>                    config to point a coding agent at a model
+  fornax run      <harness> [-- args]                 launch that agent against it
+  fornax bench    --url <base> --model <id>           measure a live endpoint
+
+  fornax version
 ```
+
+`fornax <command> -h` prints the flags of a command that has any. A
+usage mistake exits 2, a failed operation exits 1.
 
 ## Documentation
 
-| Doc | For | What it answers |
+| Page | For | What it answers |
 |---|---|---|
-| [Models](docs/models.md) | anyone | What is served, on what hardware, and what each endpoint answers |
-| [Deploy guide](docs/deploy.md) | operators | Build images, freeze weights, deploy on k8s or systemd, every config knob |
-| [Sizing a model for a GPU](docs/practice.md) | operators | Whether a model fits a machine, and how fast it will be once it does |
-| [Development](docs/development.md) | contributors | Build from source, the test targets, repo layout |
-| [Specs](specs/README.md) | contributors | The design records behind every decision |
+| [Deploy guide](docs/deploy.md) | operators | images, freezing weights, Kubernetes and bare-metal deploys, every manifest field and runtime setting, telemetry, troubleshooting |
+| [Models](docs/models.md) | operators and client developers | the checked-in manifests, what each endpoint answers, adding a model |
+| [Coding agents](docs/coding-agents.md) | people coding against a served model | pointing Claude Code, Codex, or opencode at a model on a host |
+| [Sizing a model for a GPU](docs/practice.md) | operators planning hardware | whether a model fits a machine, and how fast it will be once it does |
+| [Development](docs/development.md) | contributors | building from source, the test targets, the repository layout |
+| [Specs](specs/README.md) | contributors | the design record behind each decision |
 
-## Status
+## The checked-in models
 
-Working today: the `fornax` command end to end — weight fetch, freeze
-and verify, the serving entrypoint and health shim, all three caller
-dialects, the bench harness, and `install` for a bare-metal host.
-Pinned manifests with the deploy artifact each one owns, and a
-consistency check between them that runs in CI and in `fornax validate`.
-The whole pipeline is exercised end to end on a laptop.
+The `models/` directory holds the set Latere is bringing up: six
+frontier-scale mixture-of-experts models for Kubernetes GPU nodes, and a
+dense model in two variants for a single GB10 host, each meant to sit
+behind a model gateway such as [Lux](https://github.com/latere-ai/lux).
+That set is one deployment's answer, not the tool's: a model is a
+manifest, and your registry is whatever manifests you check in.
+[docs/models.md](docs/models.md) lists them with the hardware each
+targets.
 
-Qwen3.8-27B serves on a GB10 host, at full BF16 with no quantization,
-answering on all three dialects including vision. It is slow: **3.0
-tok/s** measured, which is what undamaged 27B weights cost on one
-unified-memory GPU. A 4-bit fast path with a draft head is built and
-its manifest validates, but nothing has been served through it yet.
+## Contributing
 
-Not yet done: the multi-hundred-GB mirrors, the GPU deployments, and
-gateway registration. The per-model specs record what each one is
-blocked on, and the monitoring-plane specs (012 through 016) are design
-only, with no code in this repo yet.
-
-APIs are not frozen. The manifest schema, the shim's endpoints and the
-CLI flags may change while the first models are brought up.
-
-## How Latere uses it
-
-Fornax is built to be Latere's inference layer, in place of renting
-model access through a router: seven open-weight models pinned and
-frozen, six for bare-metal Kubernetes GPU nodes and one for a
-single-GPU GB10 host, each registered as a provider behind Lux, the
-Latere model gateway. Lux serves its own dialect and embeds the same
-translator package, so a model endpoint and the gateway in front of it
-never disagree about what a request means. What is up today and what is
-still blocked is the Status section above.
-
-That set is one deployment's answer, not the tool's. The models, the
-hardware each one targets, and what each is blocked on are in
-[docs/models.md](docs/models.md).
+Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md)
+covers how a change is made and reviewed, and
+[docs/development.md](docs/development.md) how to build and test it.
 
 ## License
 
-MIT. See [LICENSE](./LICENSE).
+MIT. See [LICENSE](./LICENSE). Each model's weights carry their own
+license, recorded in its manifest.
