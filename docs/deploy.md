@@ -1,71 +1,101 @@
-# Deployment Guide
+# Deploy guide
 
-How to take a model from Hugging Face to a serving endpoint behind Lux:
-build the images, freeze the weights into S3, deploy on GPU Kubernetes,
-and verify. The configuration reference at the end lists every
-customization knob. Design rationale lives in [`specs/`](../specs/README.md).
+How to take a model from Hugging Face to a serving endpoint: build the
+images, freeze the weights, deploy on GPU Kubernetes or on a single
+bare-metal host, and verify. The configuration reference at the end
+lists every field and setting.
+
+The two paths are not equally proven. The bare-metal path serves a model
+on a GB10 host today. The Kubernetes path is built, and CI checks
+every checked-in manifest against its LeaderWorkerSet, but no model has
+served on a GPU node yet. Expect to find the first problems on it
+yourself.
 
 ## Prerequisites
 
+For Kubernetes:
+
 | What | Why | Notes |
 |---|---|---|
-| An S3-compatible bucket | frozen weights home | AWS S3, DO Spaces, R2, MinIO, anything s5cmd speaks. Enable versioning; Object Lock if supported. The checked-in manifests point at a bucket named `latere-models`; change `s3_prefix` in `models/*.yaml` to use your own. |
-| k8s Secret `mirror-s3` in ns `fornax` | mirror Job + node cache credentials | keys: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, plus `S3_ENDPOINT_URL` for non-AWS. Optional `HF_TOKEN` for gated repos. |
-| GPU nodes + NVIDIA GPU Operator | run the engines | node pools labeled `latere.ai/gpu-pool: h200`, `b200`, or `b300`; NVMe at `/var/cache/fornax`. The `b300` pool needs an **r580+ driver** — Kimi-K3's image is CUDA 13 only |
-| [LeaderWorkerSet](https://github.com/kubernetes-sigs/lws) installed | pod-group primitive for (multi-node-ready) serving | `kubectl apply --server-side -f https://github.com/kubernetes-sigs/lws/releases/latest/download/manifests.yaml` |
-| `docker login <registry>` | push images | default registry is `ghcr.io/latere-ai`; any OCI registry works (ECR, Nexus, Harbor, …) via `REGISTRY=` |
+| An S3 compatible bucket | where frozen weights live | AWS S3, DigitalOcean Spaces, Cloudflare R2, MinIO, anything `s5cmd` reaches. Turn on versioning, and Object Lock if the provider has it. The checked-in manifests name a bucket called `latere-models`; change `s3_prefix` in `models/*.yaml` to your own. |
+| A Secret `mirror-s3` in the namespace `fornax` | credentials for the mirror Job and the node cache | keys `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, plus `S3_ENDPOINT_URL` for anything that is not AWS. |
+| GPU nodes and the NVIDIA GPU Operator | run the engines | the checked-in artifacts select node pools by the label `latere.ai/gpu-pool` with the values `h200`, `b200`, or `b300`, and expect NVMe at `/var/cache/fornax`. Change the label in `deploy/*/lws.yaml` to match your nodes. The `b300` pool needs an r580 or newer driver, because the Kimi K3 image is CUDA 13 only. |
+| [LeaderWorkerSet](https://github.com/kubernetes-sigs/lws) | the pod-group primitive serving runs as | `kubectl apply --server-side -f https://github.com/kubernetes-sigs/lws/releases/latest/download/manifests.yaml` |
+| A container registry you can push to | the images | `ghcr.io/latere-ai` by default; any OCI registry works through `REGISTRY=` |
+
+For a bare-metal host: Linux with systemd, an NVIDIA GPU with its
+driver, and the engine installed as described in
+[section 4](#4-bare-metal-hosts). No bucket and no cluster.
 
 ## 1. Build and push images
 
-Four images, versioned together:
+No images are published yet, so build them. Four images, versioned
+together:
 
 ```sh
-make push-images VERSION=v0.1.0
-# or into your own registry (ECR, Nexus, Harbor, ...):
-make push-images VERSION=v0.1.0 REGISTRY=nexus.example.com/latere
+make push-images VERSION=v0.1.0 REGISTRY=registry.example.com/fornax
 ```
 
-builds and pushes `linux/amd64` images (default registry
-`ghcr.io/latere-ai`; the image *names* are fixed, the registry prefix is
-yours):
+builds `linux/amd64` images and pushes them. The image names are fixed;
+the registry prefix is yours.
 
-- `fornax-runtime-sglang` — SGLang engine (pinned; see the [engine decision record](../specs/001-inference-engine-selection.md)) + the `fornax serve` entrypoint
-- `fornax-runtime-sglang-k3` — Kimi-K3-capable SGLang (CUDA 13, r580+ driver). Separate image because that driver requirement should not reach the h200/b200 pools
-- `fornax-runtime-vllm` — vLLM engine + the `fornax serve` entrypoint (also the `load: s3-stream` path)
-- `fornax-mirror` — the `fornax` binary + `hf` + `s5cmd`, for the weight-freeze Job
+| Image | What it runs |
+|---|---|
+| `fornax-runtime-sglang` | SGLang `v0.5.16-cu129` and the `fornax serve` entrypoint |
+| `fornax-runtime-sglang-k3` | a Kimi K3 capable SGLang build (CUDA 13, r580 or newer driver), kept separate so that driver floor does not reach the other pools |
+| `fornax-runtime-vllm` | vLLM `v0.28.0` and the `fornax serve` entrypoint, including the `load: s3-stream` path |
+| `fornax-mirror` | the `fornax` binary with `hf` and `s5cmd`, for the weight-freeze Job |
 
-Engine versions are pinned in the Dockerfiles — bump them deliberately,
-never `latest`. After a release, update the image references in
-`deploy/*/lws.yaml` (and `deploy/mirror/job.yaml`) — the consistency
-check validates the image *name* against the manifest's runtime, not the
-registry, so a custom registry passes CI unchanged. If your registry is
-private, add an `imagePullSecrets` entry to the pod specs.
+Engine versions are pinned in `Dockerfile.sglang` and `Dockerfile.vllm`.
+Bump them deliberately and never to `latest`.
 
-## 2. Ship a model (freeze weights into S3)
+Then point the deploy artifacts at what you pushed: the `image:` lines in
+`deploy/*/lws.yaml` and `deploy/mirror/job.yaml` name
+`ghcr.io/latere-ai/...:v0.1.0`, which does not exist. `fornax validate`
+checks the image name against the manifest's runtime and ignores the
+registry, so a custom registry passes the check unchanged. If your
+registry is private, add `imagePullSecrets` to the pod specs.
 
-One-time per model revision. In-cluster (recommended — bandwidth and
-disk live there):
+## 2. Freeze the weights into a bucket
+
+Once per model revision. Run it in the cluster, where the bandwidth and
+the disk are:
 
 ```sh
 # Edit deploy/mirror/job.yaml: set metadata.name, MODEL_REPO, MODEL_SHA,
-# --bucket, and the scratch volume size (>= the model's size on disk).
+# --bucket, and the scratch volume size (at least the model's size on disk).
 kubectl -n fornax apply -f deploy/mirror/job.yaml
 kubectl -n fornax logs -f job/mirror-<name>
 ```
 
-The Job pulls from HF (SHA256-verified against LFS OIDs, safetensors
-only), uploads via s5cmd, and writes `_manifest.json` last — its
-presence marks the mirror complete. Re-running is idempotent; verify
-anytime:
+The Job resolves the revision, lists the repository's files, downloads
+them, checks each against its published size and, for large files,
+the SHA-256 the Hub publishes, hashes the rest itself, uploads through
+`s5cmd`, and writes `_manifest.json` last. Its presence
+marks the mirror complete. Running the Job again is safe: files already
+verified are not fetched again. Check a mirror at any time:
 
 ```sh
 fornax verify s3://<your-bucket>/<org>/<repo>/<sha>/
 fornax list --bucket s3://<your-bucket>
 ```
 
-Then pin the model in `models/<name>.yaml` (see the configuration
-reference below) and run `make validate`. CI enforces that every model
-manifest has a consistent `deploy/<name>/lws.yaml`.
+Two rules decide what can be frozen:
+
+- **Safetensors only.** A repository whose files include anything but
+  `.safetensors` weights and known non-weight companions (configuration,
+  tokenizer files, documentation, source) is refused before anything is
+  downloaded, and the error names the file.
+- **Public repositories only, for now.** A gated repository works: its
+  metadata is public, and `hf download` reads `HF_TOKEN` for the files,
+  so put the token in the `mirror-s3` Secret. A private repository does
+  not: the revision and file-list requests `fornax` makes before the
+  download send no token, so it fails at the first request.
+
+Then pin the model in `models/<name>.yaml` (see the
+[manifest reference](#model-manifest-modelsnameyaml)) and run
+`make validate`. CI refuses a manifest without a consistent
+`deploy/<name>/lws.yaml`.
 
 ## 3. Deploy and serve
 
@@ -79,88 +109,98 @@ kubectl -n fornax create configmap kimi-k2-7-code-manifest \
 kubectl -n fornax apply -f deploy/kimi-k2.7-code/lws.yaml
 ```
 
-Watch startup — the pod stages weights from S3 onto node NVMe, then
-launches the engine:
+Watch the start. The pod stages the weights from the bucket onto the
+node's NVMe, verifies them, then launches the engine:
 
 ```sh
 kubectl -n fornax get pods -w
 kubectl -n fornax logs -f <pod>   # "weights: fetching ..." then "launching sglang"
 ```
 
-`/readyz` returns 503 during load and 200 when the engine is up
-(readiness probe allows a long cold start; warm restarts on the same
-node skip the download entirely). Verify the endpoint:
+`/readyz` answers 503 while the model loads and 200 once the engine is
+healthy. The readiness probe allows a long cold start, and a restart on
+the same node skips the download, because the cache is keyed by
+repository and revision. Then try each surface:
 
 ```sh
 kubectl -n fornax port-forward svc/kimi-k2-7-code 8000 &
 
-# OpenAI surface (native engine passthrough)
+# OpenAI Chat: proxied to the engine untouched
 curl -s localhost:8000/v1/chat/completions -H 'Content-Type: application/json' \
   -d '{"model":"kimi-k2.7-code","max_tokens":64,"messages":[{"role":"user","content":"hello"}]}'
 
-# Anthropic surface (llmdialect translation)
+# Anthropic Messages: translated
 curl -s localhost:8000/v1/messages -H 'Content-Type: application/json' \
   -d '{"model":"kimi-k2.7-code","max_tokens":64,"messages":[{"role":"user","content":"hello"}]}'
 
-# OpenAI Responses surface (llmdialect translation)
+# OpenAI Responses: translated
 curl -s localhost:8000/v1/responses -H 'Content-Type: application/json' \
   -d '{"model":"kimi-k2.7-code","input":"hello"}'
 
-# Metrics (engine passthrough + fornax_weights_load_seconds)
+# Metrics: the engine's, plus fornax_weights_load_seconds
 curl -s localhost:8000/metrics | grep fornax
 
-# Baseline benchmark (produces the numbers the gateway's cost config needs)
+# A baseline benchmark, the figures a gateway's cost configuration needs
 fornax bench --url http://localhost:8000 --model kimi-k2.7-code \
   --concurrency 8 --requests 32 --out report.json
 ```
 
-Finally register the in-cluster endpoint
-(`http://<name>.fornax.svc:8000/v1`) as a provider in Lux. Lux is the
-only ingress; engine pods are never exposed publicly.
+Finally register the in-cluster endpoint,
+`http://<name>.fornax.svc:8000/v1`, as a provider in your model gateway
+([Lux](https://github.com/latere-ai/lux) is the one Fornax is built
+beside). Do not expose the Service directly; see [Security](#security).
 
-**License gates:** check `license`/`license_note` in the model manifest
-before you expose it through the gateway. MiniMax-M3 requires a one-time
-commercial notice, which must be sent first. Kimi-K3's
-Model-as-a-Service clause turns on whether gateway exposure counts as
-internal use, and no such determination has been recorded, so K3 must not
-be exposed yet. Kimi-K2.7 carries a modified-MIT attribution clause.
-DeepSeek's V4 checkpoints are plain MIT, with no gate.
+**Licenses.** Check `license` and `license_note` in each manifest before
+you expose a model. Among the checked-in set: MiniMax M3 requires a
+one-time commercial notice before commercial use, Kimi K3's license
+restricts offering the model as a service, so decide whether your use
+counts as internal before exposing it, and Kimi K2.7 carries a
+modified-MIT attribution clause. The DeepSeek V4 checkpoints and GLM-5.2
+are MIT, and Qwen3.8-27B is Apache-2.0.
 
 ## 4. Bare-metal hosts
 
-Everything above is the cluster path. A single GPU box with no cluster
-runs the same manifests through an installed binary and a systemd unit
-instead. A model opts in with `deploy: bare-metal`; `deploy: k8s` is the
-default, so nothing else changes.
+A single GPU box with no cluster runs the same manifests through an
+installed binary and a systemd unit. A model opts in with
+`deploy: bare-metal`; `deploy: k8s` is the default, so nothing else
+changes.
 
 ```sh
-fornax install --manifest models/qwen3.8-27b.yaml --cache-root ~/.models
-systemctl enable --now qwen3.8-27b.service
+fornax install --manifest models/qwen3.8-27b.yaml --cache-root ~/.models --user <user>
+sudo systemctl enable --now qwen3.8-27b.service
 fornax ps
 ```
 
-`install` writes the unit and copies the manifest to `/etc/fornax/`. It
-is idempotent by content: a repeated install over an unchanged manifest
-does nothing and does not reload systemd. `--print` renders the unit
-without writing it; `--no-reload` writes the files but leaves systemd
-alone, for staging a unit destined for another machine.
+`install` writes `<name>.service` to `/etc/systemd/system` and copies the
+manifest to `/etc/fornax/<name>.yaml`, then runs `systemctl
+daemon-reload`. It changes nothing when the manifest has not changed.
+
+| Flag | Default | Effect |
+|---|---|---|
+| `--manifest` | required | the model to install |
+| `--cache-root` | none, so `serve` uses `/cache` | the weights root passed to `serve` |
+| `--user` | none, so root | the user the service runs as |
+| `--speculator` | the manifest's `default_speculator` | pin a draft head into the unit; see below |
+| `--bin` | `/usr/local/bin/fornax` | the installed binary the unit runs |
+| `--config-dir` | `/etc/fornax` | where the manifest is placed |
+| `--unit-dir` | `/etc/systemd/system` | where the unit is written |
+| `--print` | off | write nothing and print the unit that would be installed |
+| `--no-reload` | off | write the files and leave systemd alone, for staging a unit meant for another machine |
+
+The unit restarts the model on failure and allows it 30 minutes to start,
+because a large model takes minutes to load and systemd's default 90
+seconds kills it mid-load and then keeps killing it.
 
 Weights come from local disk (`load: local`). `fornax pull` and
 `fornax freeze` place them under `<cache-root>/<hf_repo>/<revision>`,
-and serving verifies them there against `_manifest.json` without
+and `serve` verifies them there against `_manifest.json` without
 copying. No bucket is involved.
 
 ### Install the engine yourself
 
-This repo does not manage engines on a bare-metal host. Install the
-pinned `vllm` or `sglang` into a virtualenv and make sure the unit's
-`PATH` reaches it.
-
-**Give each engine its own virtualenv.** Installing SGLang beside vLLM
-downgrades `transformers` and `xgrammar`, and vLLM then stops working —
-the dependency sets are incompatible, not merely untested. A box that
-can serve either model needs both environments, even though it serves
-one model at a time.
+Fornax does not install engines on a bare-metal host. Install the engine
+into a virtualenv. The GB10 manifests checked in here are served with
+these versions, which differ from the container pins above:
 
 ```sh
 uv venv ~/.venvs/fornax-vllm
@@ -170,17 +210,35 @@ uv venv ~/.venvs/fornax-sglang
 uv pip install --python ~/.venvs/fornax-sglang/bin/python sglang==0.5.18
 ```
 
+**Give each engine its own virtualenv.** Installing SGLang beside vLLM
+downgrades `transformers` and `xgrammar`, and vLLM then stops working.
+The dependency sets are incompatible, not merely untested. A box that can
+serve either model needs both environments, even though it serves one
+model at a time.
+
+`serve` launches `vllm serve` for a `vllm` manifest and
+`python3 -m sglang.launch_server` for an `sglang` one, found on the
+service's `PATH`. The generated unit sets no `PATH`, so give each unit
+its engine's environment with a drop-in, which survives a later
+`fornax install`:
+
+```sh
+sudo systemctl edit qwen3.8-27b.service
+# [Service]
+# Environment=PATH=/home/<user>/.venvs/fornax-vllm/bin:/usr/local/bin:/usr/bin:/bin
+```
+
 ### Make the host recoverable before you serve on it
 
 A single GPU box with unified memory can be taken down by a
-configuration mistake, not just a hardware fault. The CPU and GPU draw
+configuration mistake, not only a hardware fault. The CPU and GPU draw
 from one pool, so an engine that claims too much of it leaves the kernel
-unable to reclaim — and the machine stops answering SSH rather than
+unable to reclaim memory, and the machine stops answering SSH instead of
 killing the engine and staying up. If the box is remote, that costs you
 the machine until someone walks to it.
 
-Two host settings turn that from "dead until a visit" into "back in a
-minute". Apply them **before** the first serve, not after:
+Two host settings turn that from "down until a visit" into "back in a
+minute". Apply them before the first serve:
 
 ```sh
 # 1. Hardware watchdog: reset the box if the kernel stops responding.
@@ -195,31 +253,34 @@ printf 'kernel.panic=10\nkernel.panic_on_oops=1\nvm.panic_on_oom=0\n' \
 sudo sysctl --system
 ```
 
-`RuntimeWatchdogSec=60s` has systemd pet the hardware watchdog every
-30 s; if the kernel stalls, the watchdog fires and the box reboots on
-its own. That is the setting that matters when you cannot reach the
+`RuntimeWatchdogSec=60s` has systemd service the hardware watchdog every
+30 seconds; if the kernel stalls, the watchdog fires and the box reboots
+on its own. That is the setting that matters when you cannot reach the
 power button.
 
-Also make sure the journal survives the reboot, or you lose the evidence
-for why it happened:
+Keep the journal across reboots, or you lose the evidence for why one
+happened:
 
 ```sh
 sudo mkdir -p /var/log/journal && sudo systemd-journal-flush
 journalctl -k -b -1 | tail -60      # the previous boot, after a crash
 ```
 
-Keep diagnostics out of `/tmp` on such a host — it is cleared on boot,
+Keep diagnostics out of `/tmp` on such a host: it is cleared on boot,
 which is exactly when you need them.
 
-`fornax serve` refuses a start whose memory fraction plus the checkpoint
-it just read would not leave the host a working reserve, so the common
-case is caught before anything allocates. The settings above cover what
-it cannot predict.
+Fornax also guards the common case itself. The manifest check refuses a
+GB10 manifest that does not state the engine's memory fraction and
+context length, or that sets the fraction above 0.80. `fornax serve`
+then refuses to start when the memory fraction, plus the checkpoint it
+just read, plus an 8 GB floor for the host, would exceed the machine's
+memory. The settings above cover what neither check can predict.
 
 ### Choosing a draft head
 
-A model offering `speculators` picks one when it starts, because which
-one is fastest depends on the workload — see
+A model that declares `speculators` starts with its
+`default_speculator`, and you can pick another when it starts, because
+which one is fastest depends on the workload; see
 [the practice notes](practice.md#choosing-a-draft-head).
 
 ```sh
@@ -233,69 +294,104 @@ name fails before anything is written. `--speculator none` serves the
 model with no draft head.
 
 `fornax ps` reports which head each model is running, and every response
-carries `X-Fornax-Speculator`. Quote it with any throughput number.
+carries `X-Fornax-Speculator`. Quote it with any throughput figure.
 
 One GPU serves one model at a time, so changing models or draft heads
 means stopping the running unit first.
 
+To use a served model from Claude Code, Codex, or opencode on the same
+host, see [coding agents](coding-agents.md).
+
+## Security
+
+`fornax serve` checks no credential. Anyone who can reach the port can
+use the model, and read `/metrics`. The engine behind it listens on all
+interfaces as well, on port 30000 by default, with no authentication of
+its own.
+
+- On Kubernetes, keep the Service cluster-internal and let a model
+  gateway be the only way in. The gateway holds the credentials, the
+  quotas, and the audit trail.
+- On a bare-metal host, keep both ports off public networks: bind the
+  host to a private network or firewall 8000 and 30000 to the callers you
+  mean.
+
+`fornax endpoint` and `fornax run` emit a placeholder token only because
+some clients refuse to start without one. It protects nothing.
+
 ## Local rehearsal
 
-The full pipeline runs on a laptop at zero cloud cost — same manifests,
-same tools, MinIO for S3, a 0.6B model, mlx as the engine:
+The whole pipeline runs on a laptop at no cloud cost, with the same
+manifests and tools: MinIO for the bucket, a 0.6B model, and `mlx_lm` as
+the engine.
 
 ```sh
 make e2e-local
 ```
 
-Use it to validate changes to the runtime and mirror before touching real
-hardware. It needs Docker or Podman, `uv`, and Apple silicon, since the
-local engine is mlx.
+Use it to check a change to the runtime or the mirror before touching
+real hardware. It needs Docker or Podman, `uv`, Apple silicon for mlx,
+and a one-time download of about 1.5 GB.
 
 ## Configuration reference
 
-### Model manifest (`models/<name>.yaml`) — the deploy's source of truth
+### Model manifest (`models/<name>.yaml`)
+
+The manifest is the source of truth for a deploy. `fornax validate`
+reports every problem in one message.
 
 | Field | Values | Effect |
 |---|---|---|
-| `name` | `[a-z0-9.-]+` | model id callers use; k8s resources use it with `.`→`-` |
-| `hf_repo`, `revision` | repo + 40-hex commit SHA | pinned identity; `revision` must match the S3 prefix |
-| `s3_prefix` | `s3://<bucket>/<hf_repo>/<revision>/` | where frozen weights live (validated shape) |
-| `format` | free text (`fp8`, `int4-qat`, …) | documentation of the checkpoint format |
-| `license`, `license_note` | free text | compliance record; gates noted here block Lux exposure |
-| `runtime` | `sglang` \| `vllm` \| `custom` | which engine image; `custom` requires `image:` and serves any container honoring the health contract |
-| `image` | image ref | custom-runtime container (OCR wrappers etc.) |
-| `engine_dialect` | `openai-chat` (default) \| `anthropic-messages` \| `openai-responses` | the wire dialect the engine itself speaks. All three caller surfaces are served whatever it is; the matching one is proxied untouched, the others translate and report what the translation dropped in `X-Fornax-Compat-Loss` and `fornax_dialect_loss_total` |
-| `deploy` | `k8s` (default) \| `bare-metal` | which deploy artifact the model owns: `deploy/<name>/lws.yaml` or `deploy/<name>/<name>.service`. Never both |
-| `load` | `nvme-cache` (default) \| `s3-stream` \| `local` | staged via node NVMe, vLLM-only direct S3 streaming, or verified in place on the host's disk with no bucket (`s3_prefix` must then be empty) |
-| `speculators` | map of name → `{hf_repo, revision, s3_prefix, license, license_note, args}` | draft-model configurations the model offers; `fornax serve --speculator <name>` selects one. An entry naming an `hf_repo` is a separately published draft head and must pin a revision and state its own license — it is frozen and verified like primary weights. An entry with only `args` selects a head inside the target checkpoint. The draft path is never written here: it resolves to `<cache-root>/<hf_repo>/<revision>` at launch. These `args` are appended **after** the model's own, so they override |
-| `default_speculator` | a `speculators` key \| `none` | which head runs when the operator names none. Required whenever `speculators` is set |
-| `gpu` | `{type, count, nodes}` | resource shape; must match the LWS manifest (CI-checked) |
-| `context_max` | int | documented context config; pair with the KV-cache args it needs |
-| `args` | list, verbatim | engine CLI flags — parallelism (`--tp-size`), parsers (`--tool-call-parser`), quantization, KV dtype. Per-model required flags are enforced (MiniMax `--block-size=128`; Kimi-K3 and V4-Flash-0731 `--trust-remote-code`), as are the DSpark constraints: with `--speculative-algorithm DSPARK`, a separate `--speculative-draft-model-path`, `--pp-size` > 1, or DP attention are rejected |
-| `system_prompt` | `{mode, text}` | enforced by the shim on every request, whichever surface it arrives on: `default` (only when caller sends none) \| `prepend` \| `override` |
+| `name` | `[a-z0-9.-]+`, required | the model id callers use. Kubernetes resources use it with `.` replaced by `-` |
+| `hf_repo`, `revision` | `<org>/<name>` and a 40-hex commit SHA, required | the pinned identity. `revision` must also appear in `s3_prefix` |
+| `s3_prefix` | `s3://<bucket>/<hf_repo>/<revision>/` | where the frozen weights live. Required unless `load: local`, which requires it empty |
+| `format` | free text (`fp8`, `int4-qat`, ...), required | a record of the checkpoint format |
+| `license`, `license_note` | free text; `license` required | the compliance record. A gate noted here is yours to honor before exposing the model |
+| `runtime` | `sglang`, `vllm`, or `custom`, required | which engine image runs. `custom` requires `image` and serves any container that answers the health contract |
+| `image` | an image reference | the container for `runtime: custom`, and allowed only there |
+| `engine_dialect` | `openai-chat` (default), `anthropic-messages`, or `openai-responses` | the wire dialect the engine itself speaks. All three caller surfaces are served whatever it is; the matching one is proxied untouched, the others are translated, and what a translation dropped is reported in `X-Fornax-Compat-Loss` and `fornax_dialect_loss_total` |
+| `deploy` | `k8s` (default) or `bare-metal` | which deploy artifact the model owns: `deploy/<name>/lws.yaml` or `deploy/<name>/<name>.service`, never both. `bare-metal` does not allow `image` |
+| `load` | `nvme-cache`, `s3-stream`, or `local`, required | stage the weights on node NVMe; stream them from the bucket (vLLM only); or verify them in place on the host's disk with no bucket |
+| `gpu` | `{type, count, nodes}`, required | the resource shape; must match the LeaderWorkerSet. `type: gb10` requires `count: 1` and `nodes: 1` |
+| `context_max` | a positive integer, required | the context the model is configured for; pair it with the KV cache arguments it needs |
+| `args` | a list, passed verbatim; required for `sglang` and `vllm` | the engine flags for this model: parallelism (`--tp-size`), parsers (`--tool-call-parser`), quantization, KV dtype. Some are enforced per model: MiniMax M3 needs `--block-size=128`, and Kimi K3 and DeepSeek V4 Flash 0731 need `--trust-remote-code`. With `--speculative-algorithm DSPARK`, a separate `--speculative-draft-model-path`, `--pp-size` above 1, and DP attention are refused. On `gpu.type: gb10` the memory fraction (`--gpu-memory-utilization` or `--mem-fraction-static`) and the context bound (`--max-model-len` or `--context-length`) must be stated, and the fraction may not exceed 0.80 |
+| `speculators` | a map of name to `{hf_repo, revision, s3_prefix, license, license_note, args}` | the draft heads the model offers; `--speculator <name>` selects one. An entry naming an `hf_repo` is a separately published head: it pins its own revision and states its own license, and is frozen and verified like the main weights. An entry with only `args` selects a head inside the model's checkpoint. The draft path is resolved at launch to `<cache-root>/<hf_repo>/<revision>`, never written here. These `args` come after the model's own, so they win |
+| `default_speculator` | a `speculators` key, or `none` | the head that runs when none is named. Required whenever `speculators` is set |
+| `system_prompt` | `{mode, text}` | applied by the shim to every request on every surface. `mode` is `default` (only when the caller sends none), `prepend`, or `override` |
 
-The runtime always adds `--served-model-name <name>` so callers address
-the manifest name, and renders the base engine command itself — `args`
-only carries model-specific flags.
+The runtime renders the base engine command itself and always adds
+`--served-model-name <name>`, so `args` carries only what is specific to
+the model.
 
-### Runtime container (flags / env)
+### `fornax serve`
 
-| Knob | Default | Purpose |
+| Setting | Default | Purpose |
 |---|---|---|
-| `--manifest` | `/etc/fornax/model.yaml` | manifest path (mounted ConfigMap) |
-| `--port` | 8000 | shim/service port (`/livez`, `/readyz`, `/version`, `/metrics`, and all three caller surfaces: `/v1/chat/completions`, `/v1/messages`, `/v1/responses`) |
-| `--engine-port` | 30000 | engine's internal port |
-| `--cache-root` | `/cache` | NVMe cache mount; keyed by repo+revision, flock-shared across pods on a node |
-| `--speculator` | the manifest's `default_speculator` | which draft head to serve with; `none` disables speculation. Resolved before any weights are touched, and reported on every response as `X-Fornax-Speculator` |
-| `FORNAX_ENGINE_CMD` | unset | replace the engine command (`{model}`/`{port}` substituted) — local/dev substitution, e.g. mlx |
-| `FORNAX_ENGINE_HEALTH_PATH` | `/health` | engine health endpoint, for engines that differ |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset | OTLP collector to export traces, metrics and logs to. Unset, `serve` logs locally and exports nothing |
+| `--manifest` | required | the manifest path. In a container, the mounted ConfigMap at `/etc/fornax/model.yaml` |
+| `--port` | `8000` | the port the probes, `/metrics`, and the three caller surfaces answer on |
+| `--engine-port` | `30000` | the engine's own port |
+| `--cache-root` | `/cache` | the weights root. On Kubernetes, the node NVMe mount, keyed by repository and revision and shared between pods on a node under a file lock |
+| `--speculator` | the manifest's `default_speculator` | the draft head to serve with; `none` turns speculation off. Resolved before any weights are touched |
+| `FORNAX_ENGINE_CMD` | unset | replaces the engine command, with `{model}` and `{port}` substituted. For a local engine such as mlx |
+| `FORNAX_ENGINE_HEALTH_PATH` | `/health` | the engine's health path, for an engine that differs |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset | the OTLP collector traces, metrics, and logs go to. Unset, `serve` logs locally and exports nothing |
+
+### Weight commands
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `FORNAX_HF_BASE` | `https://huggingface.co` | the Hub address `fornax` resolves revisions and lists files at. `hf download` does not read it; point that tool at the same place with its own `HF_ENDPOINT` |
+| `HF_TOKEN` | unset | read by `hf download` only, which is enough for a gated repository and not for a private one; see [section 2](#2-freeze-the-weights-into-a-bucket) |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_ENDPOINT_URL` | unset | read by `s5cmd` for an `s3://` store |
+
+A `--bucket` or a store prefix that does not start with `s3://` is a
+local directory, which is how a single host or a test keeps a store with
+no bucket.
 
 ### Telemetry
 
-`fornax serve` exports traces, metrics and logs over OTLP. Point it at a
-collector with the standard environment and everything else follows from
-it:
+`fornax serve` exports traces, metrics, and logs over OTLP. Point it at a
+collector with the standard environment:
 
 ```sh
 OTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example:4318
@@ -303,49 +399,58 @@ OTEL_EXPORTER_OTLP_HEADERS=authorization=Bearer%20...   # percent-encoded; %20 i
 OTEL_TRACES_SAMPLER_ARG=0.2                             # head sampling ratio
 ```
 
-With the endpoint unset the exporters are inert and logs stay on stderr,
-so a laptop or a bare-metal host needs no collector to run.
+With the endpoint unset the exporters do nothing and logs stay on
+stderr, so a laptop or a bare-metal host needs no collector.
 
-What you get per request: a server span for the caller's request and a
-client span for the engine hop inside it, so a slow completion says
-which half was slow. Health and readiness probes and `/metrics` are not
-traced, since the kubelet and `fornax ps` poll them constantly and would
-bury everything else.
+Each request produces a server span for the caller's request and a client
+span for the engine call inside it, so a slow completion shows which half
+was slow. The probes and `/metrics` are not traced, because the kubelet
+and `fornax ps` poll them constantly.
 
-`/metrics` stays a Prometheus text endpoint because `fornax ps` reads
+`/metrics` stays a Prometheus text endpoint, because `fornax ps` reads
 `fornax_weights_load_seconds` from it. The same three facts also export
 as OTLP instruments: `fornax.weights.load.duration`,
-`fornax.speculator.info` and `fornax.dialect.loss`.
+`fornax.speculator.info`, and `fornax.dialect.loss`.
 
-### Deploy manifest (`deploy/<name>/lws.yaml`)
+### LeaderWorkerSet (`deploy/<name>/lws.yaml`)
 
-| Knob | Where | Notes |
+| Setting | Where | Notes |
 |---|---|---|
-| replicas | `spec.replicas` | whole serving groups (capacity planning, not HPA) |
-| group size | `leaderWorkerTemplate.size` | = `gpu.nodes`; >1 activates multi-node (needs RoCEv2/NCCL) and requires a `workerTemplate` (CI-checked: same image and GPU count as the leader, no probes — only rank 0 serves HTTP) |
-| GPU count/pool | `resources.limits."nvidia.com/gpu"`, `nodeSelector` | must match manifest `gpu` (CI-checked); pool label selects H200 / B200 / B300 |
-| image ref | container `image` | `<REGISTRY>/fornax-runtime-<engine>:<VERSION>` from `make push-images`; registry prefix is free, name must match the manifest runtime (CI-checked) |
-| NVMe cache | `volumes.cache.hostPath` | `/var/cache/fornax`; a prefetch DaemonSet warms it |
-| `/dev/shm` | `volumes.shm.sizeLimit` | ≥32Gi (vLLM requires it for DeepSeek-V4-class models) |
-| probe budget | `readinessProbe.failureThreshold` | cold start for the big models is minutes — size it accordingly |
+| replicas | `spec.replicas` | whole serving groups; capacity planning, not autoscaling |
+| group size | `leaderWorkerTemplate.size` | equals `gpu.nodes`. Above 1 is multi-node serving, which needs RoCEv2 and NCCL, and requires a `workerTemplate` with the same image and GPU count as the leader and no probes, since only rank 0 serves HTTP. Checked by `fornax validate` |
+| GPU count and pool | `resources.limits."nvidia.com/gpu"`, `nodeSelector` | must match the manifest's `gpu`, checked by `fornax validate` |
+| image | the container `image` | `<REGISTRY>/fornax-runtime-<engine>:<VERSION>` from `make push-images`. The registry is free; the name must match the manifest's runtime, checked by `fornax validate` |
+| NVMe cache | `volumes.cache.hostPath` | `/var/cache/fornax`. The first pod on a node fills it; later pods for the same revision reuse it |
+| `/dev/shm` | `volumes.shm.sizeLimit` | at least 32Gi; vLLM needs it for DeepSeek V4 class models |
+| probe budget | `readinessProbe.failureThreshold` | a cold start of a large model takes minutes, so size it for that |
 
 ### Mirror Job (`deploy/mirror/job.yaml`)
 
-| Knob | Purpose |
+| Setting | Purpose |
 |---|---|
-| `MODEL_REPO`, `MODEL_SHA` | which revision to freeze |
-| `mirror-s3` Secret | bucket credentials; `S3_ENDPOINT_URL` for DO Spaces/R2/MinIO |
-| scratch volume size | ≥ model size on disk (167 GB to 1.6 TB across the current set; Kimi-K3 alone is 1561 GB) |
+| `MODEL_REPO`, `MODEL_SHA` | the revision to freeze |
+| the `mirror-s3` Secret | bucket credentials; `S3_ENDPOINT_URL` for Spaces, R2, or MinIO |
+| scratch volume size | at least the model's size on disk: 167 GB to 1.6 TB across the checked-in set, with Kimi K3 alone at 1561 GB |
 
 ## Troubleshooting
 
-- **`/readyz` stuck at 503** — its body names the check; check pod logs: still `weights: fetching`
-  (normal on cold start), engine crash (log tail shows the engine's
-  stderr), or a hash mismatch (store corruption → run `fornax verify`).
-- **404 from `/v1/chat/completions`** — model id in the request must be
-  the manifest `name` (that's the served model name).
-- **mirror Job fails mid-upload** — re-run it; push is idempotent and
-  skips verified files. `_manifest.json` absent = mirror incomplete.
-- **Second pod on a node re-downloads** — cache is keyed by
-  repo+revision under `--cache-root`; confirm the hostPath mount and
-  that revisions actually match.
+- **`/readyz` stays at 503.** The body names the check. In the pod or
+  unit log, `weights: fetching` is a normal cold start; an engine crash
+  shows the engine's stderr; a hash mismatch means the store is damaged,
+  so run `fornax verify` on it.
+- **404 from `/v1/chat/completions`.** The `model` in the request must be
+  the manifest's `name`, which is the name the engine serves under.
+- **The mirror Job fails mid-upload.** Run it again. The push skips files
+  already verified, and a missing `_manifest.json` means the mirror is
+  incomplete.
+- **A second pod on the same node downloads again.** The cache is keyed
+  by repository and revision under `--cache-root`; check the `hostPath`
+  mount and that the revisions match.
+- **`fornax pull` fails with `401` or `404` on the first request.** The
+  repository is private, or the name or revision is wrong; see
+  [section 2](#2-freeze-the-weights-into-a-bucket). A `403` from
+  `hf download` on a gated repository means `HF_TOKEN` is missing or has
+  not been granted access.
+- **`fornax serve` exits at once with `executable file not found`.** The
+  engine is not on the service's `PATH`; see
+  [installing the engine](#install-the-engine-yourself).
