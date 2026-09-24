@@ -51,7 +51,7 @@ say "minio: local S3 on :$MINIO_PORT"
 mkdir -p "$SCRATCH/minio"
 "$DOCKER" run -d --name fornax-minio -p "$MINIO_PORT:9000" \
   -v "$SCRATCH/minio:/data" \
-  quay.io/minio/minio server /data >/dev/null
+  ghcr.io/latere-ai/minio:RELEASE.2026-09-24T20-02-18Z@sha256:889173592b42fb0ff8d00d540ddbdcecbb4607115160b8e29243b3ed51a4aceb server /data >/dev/null
 export AWS_ACCESS_KEY_ID=minioadmin AWS_SECRET_ACCESS_KEY=minioadmin
 export AWS_REGION=us-east-1 S3_ENDPOINT_URL="http://127.0.0.1:$MINIO_PORT"
 for _ in $(seq 1 30); do
