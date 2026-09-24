@@ -25,7 +25,9 @@ spec:
       restartPolicy: Never
       containers:
         - name: mirror
-          image: ghcr.io/latere-ai/fornax-mirror:v0.1.0
+          # :unreleased is a placeholder; no such image is published. Replace
+          # it with the registry and version you pushed (docs/deploy.md).
+          image: ghcr.io/latere-ai/fornax-mirror:unreleased
           # push re-verifies the scratch dir against the HF tree, then
           # uploads and writes _manifest.json last (idempotent; safe to
           # re-run after interruption).

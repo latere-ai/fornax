@@ -49,12 +49,25 @@ the registry prefix is yours.
 Engine versions are pinned in `Dockerfile.sglang` and `Dockerfile.vllm`.
 Bump them deliberately and never to `latest`.
 
-Then point the deploy artifacts at what you pushed: the `image:` lines in
-`deploy/*/lws.yaml` and `deploy/mirror/job.yaml` name
-`ghcr.io/latere-ai/...:v0.1.0`, which does not exist. `fornax validate`
-checks the image name against the manifest's runtime and ignores the
-registry, so a custom registry passes the check unchanged. If your
-registry is private, add `imagePullSecrets` to the pod specs.
+Then point the deploy artifacts at what you pushed. The `image:` lines in
+`deploy/*/lws.yaml` and `deploy/mirror/job.yaml` carry the placeholder
+`ghcr.io/latere-ai/<image>:unreleased`. No image is published under that
+tag, so an artifact applied unchanged fails to pull instead of running a
+build you did not choose. Replace the placeholder with the registry and
+version you pushed:
+
+```sh
+REGISTRY=registry.example.com/fornax VERSION=v0.1.0
+sed -i.orig "s|ghcr\.io/latere-ai/\(fornax-[a-z0-9-]*\):unreleased|$REGISTRY/\1:$VERSION|" \
+  deploy/*/lws.yaml deploy/mirror/job.yaml
+rm deploy/*/*.orig
+```
+
+`-i.orig` is the in-place form both GNU and BSD `sed` accept. `fornax
+validate` checks the image name against the manifest's runtime and ignores
+the registry and the tag, so the rewritten artifacts pass the check
+unchanged. If your registry is private, add `imagePullSecrets` to the pod
+specs.
 
 ## 2. Freeze the weights into a bucket
 

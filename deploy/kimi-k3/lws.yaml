@@ -30,7 +30,9 @@ spec:
         containers:
           # K3-only image: CUDA 13, needs an r580+ driver on this pool.
           - name: runtime
-            image: ghcr.io/latere-ai/fornax-runtime-sglang-k3:v0.1.0
+            # :unreleased is a placeholder; no such image is published. Replace
+            # it with the registry and version you pushed (docs/deploy.md).
+            image: ghcr.io/latere-ai/fornax-runtime-sglang-k3:unreleased
             args: ["serve", "--manifest", "/etc/fornax/model.yaml"]
             ports:
               - containerPort: 8000

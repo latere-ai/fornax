@@ -14,3 +14,10 @@ committed: the commit log already holds that.
   Go module to `latere.ai/x/fornax`. The command is now `cmd/fornax`.
 - Update configuration, headers, metrics, harness provider names, image names,
   and deployment defaults to Fornax. Model IDs and weight formats are unchanged.
+
+### Fixed
+
+- The deploy artifacts no longer name `ghcr.io/latere-ai/fornax-*:v0.1.0`,
+  images that were never published. They carry the placeholder tag
+  `unreleased`, and the deploy guide gives the one `sed` command that
+  replaces it with the registry and version you pushed.

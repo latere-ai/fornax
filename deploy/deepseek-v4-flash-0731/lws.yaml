@@ -21,7 +21,9 @@ spec:
           latere.ai/gpu-pool: b200
         containers:
           - name: runtime
-            image: ghcr.io/latere-ai/fornax-runtime-sglang:v0.1.0
+            # :unreleased is a placeholder; no such image is published. Replace
+            # it with the registry and version you pushed (docs/deploy.md).
+            image: ghcr.io/latere-ai/fornax-runtime-sglang:unreleased
             args: ["serve", "--manifest", "/etc/fornax/model.yaml"]
             ports:
               - containerPort: 8000

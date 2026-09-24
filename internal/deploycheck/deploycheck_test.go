@@ -4,6 +4,7 @@
 package deploycheck
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,6 +20,77 @@ func TestRepoConsistency(t *testing.T) {
 	if err := Validate("../../models", "../../deploy"); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// placeholderTag is the tag the checked-in manifests carry on every image
+// under ghcr.io/latere-ai. Fornax publishes no images, so any other tag there
+// names something that does not exist and reads as though it did; the
+// operator replaces the placeholder with the registry and version they
+// pushed (docs/deploy.md, section 1).
+const placeholderTag = "unreleased"
+
+// TestCheckedInImagesAreUnpublishedPlaceholders fails when a manifest under
+// deploy/ names a ghcr.io/latere-ai image by any tag but the placeholder.
+// The manifests once named :v0.1.0, which was never pushed, so an operator
+// who applied them unchanged got an image pull failure instead of a message
+// telling them to build and push first.
+func TestCheckedInImagesAreUnpublishedPlaceholders(t *testing.T) {
+	var checked int
+	err := filepath.WalkDir("../../deploy", func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || filepath.Ext(path) != ".yaml" {
+			return err
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		docs, err := splitDocs(data)
+		if err != nil {
+			return fmt.Errorf("%s: %w", path, err)
+		}
+		for _, doc := range docs {
+			for _, ref := range imagesIn(doc) {
+				checked++
+				if !strings.HasPrefix(ref, "ghcr.io/latere-ai/") {
+					continue
+				}
+				// The tag follows the last path component's colon; a digest
+				// is not a tag, and a reference with neither pulls :latest.
+				name, _, _ := strings.Cut(ref[strings.LastIndex(ref, "/")+1:], "@")
+				if _, tag, _ := strings.Cut(name, ":"); tag != placeholderTag {
+					t.Errorf("%s: image %q is not published; name it with the :%s placeholder", path, ref, placeholderTag)
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checked == 0 {
+		t.Fatal("no image found under deploy/; the walk is broken, not the manifests")
+	}
+}
+
+// imagesIn returns every value of an "image" key anywhere in a decoded
+// YAML document.
+func imagesIn(v any) []string {
+	var refs []string
+	switch v := v.(type) {
+	case map[string]any:
+		for k, child := range v {
+			if s, ok := child.(string); ok && k == "image" {
+				refs = append(refs, s)
+				continue
+			}
+			refs = append(refs, imagesIn(child)...)
+		}
+	case []any:
+		for _, child := range v {
+			refs = append(refs, imagesIn(child)...)
+		}
+	}
+	return refs
 }
 
 // TestCheckedInUnitsAreGenerated keeps the repo's bare-metal units
