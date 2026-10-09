@@ -65,6 +65,18 @@ func TestUnitOmitsCacheRootWhenUnset(t *testing.T) {
 	}
 }
 
+// TestUnitRunsAsTheUserGiven: a user names the unit's User=, and no user
+// leaves systemd's default.
+func TestUnitRunsAsTheUserGiven(t *testing.T) {
+	m, _ := bareMetalManifest(t, t.TempDir())
+	if u := Unit(m, Options{User: "fornax"}); !strings.Contains(u, "\nUser=fornax\n") {
+		t.Errorf("unit does not run as fornax:\n%s", u)
+	}
+	if u := Unit(m, Options{}); strings.Contains(u, "User=") {
+		t.Errorf("unit names a user nobody gave:\n%s", u)
+	}
+}
+
 // TestUnitStartTimeoutOutrunsWeightLoad guards the value, not just its
 // presence: systemd's 90 s default would kill a large model mid-load
 // and restart it forever, which reads as a crash rather than a timeout
@@ -193,6 +205,32 @@ func TestRunUpdatesChangedManifest(t *testing.T) {
 	}
 	if len(entries) != 1 {
 		t.Fatalf("install duplicated files: %d entries", len(entries))
+	}
+}
+
+// TestRunStopsOnWhatItCannotReadOrWrite: a source manifest that is not
+// there, and a manifest or unit directory that cannot be made, each end the
+// install with the error.
+func TestRunStopsOnWhatItCannotReadOrWrite(t *testing.T) {
+	dir := t.TempDir()
+	m, p := bareMetalManifest(t, dir)
+	file := filepath.Join(dir, "file")
+	if err := os.WriteFile(file, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	reload := func(io.Writer) error { return nil }
+	for name, c := range map[string]struct {
+		src  string
+		opts Options
+	}{
+		"no source manifest": {filepath.Join(dir, "missing.yaml"), Options{ConfigDir: dir, UnitDir: dir}},
+		"no manifest dir":    {p, Options{ConfigDir: filepath.Join(file, "etc"), UnitDir: dir}},
+		"no unit dir":        {p, Options{ConfigDir: t.TempDir(), UnitDir: filepath.Join(file, "units")}},
+	} {
+		c.opts.Reload = reload
+		if res, err := Run(m, c.src, c.opts, io.Discard); err == nil {
+			t.Errorf("%s: installed anyway: %+v", name, res)
+		}
 	}
 }
 
