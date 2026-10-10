@@ -479,8 +479,9 @@ func injectSystemPrompt(body []byte, sp *manifest.SystemPrompt) ([]byte, error) 
 
 // anthropicMessages serves the Anthropic Messages dialect over the
 // engine's OpenAI Chat endpoint, streaming included.
-// LossHeader names the request fields a surface could not carry. It
-// mirrors Lux's X-Lux-Compat-Loss so a client parsing one parses both.
+// LossHeader names the request fields a surface could not carry. Its
+// value has the form of Lux's loss header, Lux-Loss, so a client parsing
+// one parses both. Lux's was X-Lux-Compat-Loss when this one was named.
 const LossHeader = "X-Fornax-Compat-Loss"
 
 // translated serves a caller dialect the engine does not speak, through
