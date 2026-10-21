@@ -27,6 +27,8 @@ committed: the commit log already holds that.
   images that were never published. They carry the placeholder tag
   `unreleased`, and the deploy guide gives the one `sed` command that
   replaces it with the registry and version you pushed.
+- **Built with Go 1.27.3,** which fixes GO-2026-6809, a flaw in the
+  standard library's certificate verification that this code can reach.
 
 ### Security
 
