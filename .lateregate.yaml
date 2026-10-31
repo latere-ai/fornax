@@ -43,6 +43,7 @@ depcheck:
       allow:
         gopkg.in/yaml.v3: model manifests and deploy artifacts are YAML
         latere.ai/x/pkg: the shared platform packages
+        latere.ai/x/sdk-go/llm/wire: the message types pkg/llmdialect takes from the SDK since pkg v0.104.0; stdlib only
         go.opentelemetry.io: the OTLP SDK and HTTP instrumentation behind latere.ai/x/pkg/otel
         google.golang.org: the protobuf and gRPC encoding the OTLP exporters write
         golang.org/x: HTTP/2 and text handling the OTLP exporters reach through
