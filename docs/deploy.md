@@ -41,7 +41,7 @@ the registry prefix is yours.
 
 | Image | What it runs |
 |---|---|
-| `fornax-runtime-sglang` | SGLang `v0.5.16-cu129` and the `fornax serve` entrypoint |
+| `fornax-runtime-sglang` | SGLang `v0.5.19-cu129` and the `fornax serve` entrypoint |
 | `fornax-runtime-sglang-k3` | a Kimi K3 capable SGLang build (CUDA 13, r580 or newer driver), kept separate so that driver floor does not reach the other pools |
 | `fornax-runtime-vllm` | vLLM `v0.28.0` and the `fornax serve` entrypoint, including the `load: s3-stream` path |
 | `fornax-mirror` | the `fornax` binary with `hf` and `s5cmd`, for the weight-freeze Job |
