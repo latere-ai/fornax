@@ -45,7 +45,7 @@ jobs:
   otel:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Instrumented HTTP clients
         run: make lint-otel
