@@ -4,7 +4,7 @@
 # SGLANG_IMAGE selects the base. Two images are built from this one file
 # because they differ only in that base:
 #
-#   default  lmsysorg/sglang:v0.5.16-cu129        -> fornax-runtime-sglang
+#   default  lmsysorg/sglang:v0.5.19-cu129        -> fornax-runtime-sglang
 #   K3       lmsysorg/sglang:kimi-k3-...          -> fornax-runtime-sglang-k3
 #
 # They stay separate *images* on purpose (specs/018 AC4): K3 support lives
