@@ -19,7 +19,7 @@
 #
 # This ARG must stay above the first FROM: an ARG declared after a stage's
 # instructions is scoped to that stage, and the later FROM cannot see it.
-ARG SGLANG_IMAGE=lmsysorg/sglang:v0.5.16-cu129
+ARG SGLANG_IMAGE=lmsysorg/sglang:v0.5.19-cu129
 
 FROM golang:1.27 AS build
 WORKDIR /src
