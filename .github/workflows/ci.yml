@@ -1,22 +1,8 @@
 name: ci
 
-# The gates this repo runs on every push live in latere-ai/ci (which orders
-# them) and latere-ai/ci-gate (which decides what each one asserts). This file
-# is the caller.
-#
-# The pipeline probes the Makefile for a fixed set of targets and runs the ones
-# it finds, so a gate in that set is turned on by adding a target rather than
-# by editing this file. Today that is:
-#
-#   required   fmt-check, test, lint-modernize
-#   optional   test-hermetic, test-race, cover, spec-lint, dist, validate
-#
-# A target outside that set needs a job here, which is why lint-otel has one.
-#
-# Every one of these also runs locally, which is the point: three CI failures
-# in one day came from tests that depended on what happened to be installed on
-# the machine running them, and each passed on a laptop first.
-
+# The bar lives in latere-ai/ci-gate, pinned in go.mod, and the shared
+# workflow runs it. What this repository decides is in .lateregate.yaml.
+# `lateregate init` writes this file, the same in every repository.
 on:
   push:
     branches: [main]
@@ -24,28 +10,17 @@ on:
   workflow_dispatch:
 
 # A newer push to the same ref supersedes this run: its commit carries every
-# change this one would verify, and the runner is better spent on it.
+# change this one would verify.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
+# actions: read lets the gate find the last commit whose CI passed, which it
+# measures the change from.
 permissions:
   contents: read
+  actions: read
 
 jobs:
-  verify:
+  gate:
     uses: latere-ai/ci/.github/workflows/lateregate.yml@v1
-
-  # An outbound client with no instrumented transport starts a new root trace,
-  # so the caller's trace ends at this process and the time spent upstream is
-  # unattributable. fornax sits on the inference data path, which makes that
-  # the one gap worth a job of its own.
-  #
-  # No Go toolchain: the target reads source, so a checkout is the whole setup.
-  otel:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Instrumented HTTP clients
-        run: make lint-otel
